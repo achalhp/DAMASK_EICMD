@@ -265,6 +265,9 @@ module function plastic_phenopowerlaw_init() result(myPlasticity)
     stt%gamma_tw => plasticState(ph)%state(startIndex:endIndex,:)
     plasticState(ph)%atol(startIndex:endIndex) = pl%get_asFloat('atol_gamma',defaultVal=1.0e-6_pReal)
 
+    !if (ph == 1) write(6,*) 'crss slip', stt%xi_sl(4,:)
+    !if(ph==1) write(6,*) 'shear strain state', stt%gamma_tw(4,:)
+
     end associate
 
 !--------------------------------------------------------------------------------------------------
@@ -348,6 +351,7 @@ module function phenopowerlaw_dotState(Mp,ph,en) result(dotState)
   real(pReal), dimension(param(ph)%sum_N_sl) :: &
     dot_gamma_sl_pos,dot_gamma_sl_neg, &
     right_SlipSlip
+  real(pReal), dimension(1) :: twin_volume_fraction
 
 
   associate(prm => param(ph), stt => state(ph), &
@@ -358,7 +362,11 @@ module function phenopowerlaw_dotState(Mp,ph,en) result(dotState)
 
     call kinetics_sl(Mp,ph,en,dot_gamma_sl_pos,dot_gamma_sl_neg)
     dot_gamma_sl = abs(dot_gamma_sl_pos+dot_gamma_sl_neg)
-    call kinetics_tw(Mp,ph,en,dot_gamma_tw)
+    call kinetics_tw(Mp,ph,en,dot_gamma_tw,twin_volume_fraction)
+
+    !do i = 1, size(dot_xi_tw)
+    !  print*, 'dot_xi_tw(', i, ') = ', dot_xi_tw(i)
+    !enddo
 
     sumF = sum(stt%gamma_tw(:,en)/prm%gamma_char)
     xi_sl_sat_offset = prm%f_sat_sl_tw*sqrt(sumF)
@@ -372,6 +380,9 @@ module function phenopowerlaw_dotState(Mp,ph,en) result(dotState)
     dot_xi_tw = prm%h_0_tw_sl * sum(stt%gamma_sl(:,en))**prm%c_3 &
                 * matmul(prm%h_tw_sl,dot_gamma_sl) &
               + prm%h_0_tw_tw * sumF**prm%c_4 * matmul(prm%h_tw_tw,dot_gamma_tw)
+
+    !if(en==4) write(6,*) 'size of array', size(stt%gamma_tw, dim=1), size(stt%gamma_tw, dim=2)
+    if(en==4) write(6,*) 'twin volume fraction', twin_volume_fraction
 
   end associate
 
@@ -496,7 +507,7 @@ end subroutine kinetics_sl
 ! have the optional arguments at the end.
 !--------------------------------------------------------------------------------------------------
 pure subroutine kinetics_tw(Mp,ph,en,&
-                            dot_gamma_tw,ddot_gamma_dtau_tw)
+                            dot_gamma_tw,ddot_gamma_dtau_tw,twin_volume_fraction)
 
   real(pReal), dimension(3,3),  intent(in) :: &
     Mp                                                                                              !< Mandel stress
@@ -507,17 +518,16 @@ pure subroutine kinetics_tw(Mp,ph,en,&
   real(pReal), dimension(param(ph)%sum_N_tw), intent(out) :: &
     dot_gamma_tw
   real(pReal), dimension(param(ph)%sum_N_tw), intent(out), optional :: &
-    ddot_gamma_dtau_tw
+    ddot_gamma_dtau_tw, twin_volume_fraction
 
   real(pReal), dimension(param(ph)%sum_N_tw) :: &
     tau_tw
   integer :: i
 
-
   associate(prm => param(ph), stt => state(ph))
 
     tau_tw = [(math_tensordot(Mp,prm%P_tw(1:3,1:3,i)),i=1,prm%sum_N_tw)]
-
+    
     where(tau_tw > 0.0_pReal)
       dot_gamma_tw = (1.0_pReal-sum(stt%gamma_tw(:,en)/prm%gamma_char)) &                           ! only twin in untwinned volume fraction
                    * prm%dot_gamma_0_tw*(abs(tau_tw)/stt%xi_tw(:,en))**prm%n_tw
@@ -532,6 +542,8 @@ pure subroutine kinetics_tw(Mp,ph,en,&
         ddot_gamma_dtau_tw = 0.0_pReal
       end where
     end if
+
+    twin_volume_fraction = sum(stt%gamma_tw(:,en)/prm%gamma_char)
 
   end associate
 
