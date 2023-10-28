@@ -51,7 +51,7 @@ submodule(phase:plastic) phenopowerlaw
       h_sl_sl, &                                                                                    !< slip resistance from slip activity
       h_sl_tw, &                                                                                    !< slip resistance from twin activity
       h_tw_sl, &                                                                                    !< twin resistance from slip activity
-      !h_tw_tw!, &                                                                                    !< twin resistance from twin activity
+      h_tw_tw, &                                                                                    !< twin resistance from twin activity
       h_tw_tw_grow, &
       h_tw_tw_nucl
     real(pReal),               allocatable, dimension(:,:,:) :: &                                   !< 3D array
@@ -75,7 +75,7 @@ submodule(phase:plastic) phenopowerlaw
   type :: tIndexDotState                                                                            !< Index to access variables in 2D tPhenopowerlawState
     integer, dimension(2) :: &
       xi_sl, &
-      !xi_tw, &
+      xi_tw, &
       gamma_sl, &
       gamma_tw, &
       xi_tw_nucl, &
@@ -85,7 +85,7 @@ submodule(phase:plastic) phenopowerlaw
   type :: tPhenopowerlawState                                                                       !< state variables at material points
     real(pReal), pointer, dimension(:,:) :: &
       xi_sl, &                                                                                      !< critical shear stress for slip
-      !xi_tw, &                                                                                      !< critical shear stress for twin
+      xi_tw, &                                                                                      !< critical shear stress for twin
       gamma_sl, &                                                                                   !< shear strain due to slip
       gamma_tw, &                                                                                   !< shear strain due to twin
       xi_tw_nucl, &
@@ -217,8 +217,8 @@ module function plastic_phenopowerlaw_init() result(myPlasticity)               
       prm%P_tw     = lattice_SchmidMatrix_twin(N_tw,phase_lattice(ph),phase_cOverA(ph))
       prm%h_tw_tw  = lattice_interaction_TwinByTwin(N_tw,pl%get_as1dFloat('h_tw-tw'),phase_lattice(ph))
       prm%gamma_char = lattice_characteristicShear_twin(N_tw,phase_lattice(ph),phase_cOverA(ph))
-      !prm%h_tw_tw_nucl = 
-      !prm%h_tw_tw_grow =
+      prm%h_tw_tw_nucl = lattice_interaction_TwinByTwin(N_tw,pl%get_as1dFloat('h_tw-tw'),phase_lattice(ph))
+      prm%h_tw_tw_grow = lattice_interaction_TwinByTwin(N_tw,pl%get_as1dFloat('h_tw-tw'),phase_lattice(ph))
       !prm%chkstep_nucl = 
       !prm%chkstep_grow =
       !prm%chkgrowth_twin = 
@@ -248,8 +248,8 @@ module function plastic_phenopowerlaw_init() result(myPlasticity)               
       xi_0_tw = emptyRealArray
       allocate(prm%gamma_char,source=emptyRealArray)
       allocate(prm%h_tw_tw(0,0))
-      !allocate(prm%h_tw_tw_nucl(0,0))
-      !allocate(prm%h_tw_tw_grow(0,0))
+      allocate(prm%h_tw_tw_nucl(0,0))
+      allocate(prm%h_tw_tw_grow(0,0))
     end if twinActive
 
 !--------------------------------------------------------------------------------------------------
@@ -280,12 +280,12 @@ module function plastic_phenopowerlaw_init() result(myPlasticity)               
     Nmembers = count(material_phaseID == ph)
     sizeDotState = size(['xi_sl   ','gamma_sl']) * prm%sum_N_sl &
                  + size(['xi_tw   ','gamma_tw']) * prm%sum_N_tw !&
-                 + size(['xi_tw_nucl','xi_tw_grow']) * prm%sum_N_tw &             ! Why not size(['xi_tw_nucl','gamma_tw'])?
+                 !+ size(['xi_tw_nucl','xi_tw_grow']) * prm%sum_N_tw &             ! Why not size(['xi_tw_nucl','gamma_tw'])?
                  !+ size(['f_tw_nucl','f_tw_grow']) * prm%sum_N_tw &
                  !+ size(['variant_twin','frozen']) * prm%sum_N_tw &
     sizeState = size(['xi_sl   ','gamma_sl']) * prm%sum_N_sl &
                  + size(['xi_tw   ','gamma_tw']) * prm%sum_N_tw !&
-                 + size(['xi_tw_nucl','xi_tw_grow']) * prm%sum_N_tw &             ! Why not size(['xi_tw_nucl','gamma_tw'])?
+                 !+ size(['xi_tw_nucl','xi_tw_grow']) * prm%sum_N_tw &             ! Why not size(['xi_tw_nucl','gamma_tw'])?
                  !+ size(['f_tw_nucl','f_tw_grow']) * prm%sum_N_tw &
                  !+ size(['fmc_tw_nucl','fmc_tw_grow']) * prm%sum_N_tw &
                  !+ size(['variant_twin','frozen']) * prm%sum_N_tw &
@@ -303,12 +303,12 @@ module function plastic_phenopowerlaw_init() result(myPlasticity)               
     plasticState(ph)%atol(startIndex:endIndex) = pl%get_asFloat('atol_xi',defaultVal=1.0_pReal)
     if(any(plasticState(ph)%atol(startIndex:endIndex) < 0.0_pReal)) extmsg = trim(extmsg)//' atol_xi'
 
-    !startIndex = endIndex + 1
-    !endIndex   = endIndex + prm%sum_N_tw
-    !idx_dot%xi_tw = [startIndex,endIndex]
-    !stt%xi_tw => plasticState(ph)%state(startIndex:endIndex,:)
-    !stt%xi_tw =  spread(xi_0_tw, 2, Nmembers)
-    !plasticState(ph)%atol(startIndex:endIndex) = pl%get_asFloat('atol_xi',defaultVal=1.0_pReal)
+    startIndex = endIndex + 1
+    endIndex   = endIndex + prm%sum_N_tw
+    idx_dot%xi_tw = [startIndex,endIndex]
+    stt%xi_tw => plasticState(ph)%state(startIndex:endIndex,:)
+    stt%xi_tw =  spread(xi_0_tw, 2, Nmembers)
+    plasticState(ph)%atol(startIndex:endIndex) = pl%get_asFloat('atol_xi',defaultVal=1.0_pReal)
 
     startIndex = endIndex + 1
     endIndex   = endIndex + prm%sum_N_sl
@@ -451,18 +451,18 @@ module function phenopowerlaw_dotState(Mp,ph,en) result(dotState)               
     dot_gamma_sl_pos,dot_gamma_sl_neg, &
     right_SlipSlip
   !real(pReal), dimension(param(ph)%sum_N_tw) :: &
-    !fdot_twin_nucl, fdot_twin_grow
+    !fdot_twin_nucl, fdot_twin_grow    dot_xi_tw
 
-
+    
   associate(prm => param(ph), stt => state(ph), &
             dot_xi_sl => dotState(indexDotState(ph)%xi_sl(1):indexDotState(ph)%xi_sl(2)), &
-            !dot_xi_tw => dotState(indexDotState(ph)%xi_tw(1):indexDotState(ph)%xi_tw(2)), &
+            dot_xi_tw => dotState(indexDotState(ph)%xi_tw(1):indexDotState(ph)%xi_tw(2)), &
             dot_gamma_sl => dotState(indexDotState(ph)%gamma_sl(1):indexDotState(ph)%gamma_sl(2)), &
-            !dot_gamma_tw => dotState(indexDotState(ph)%gamma_tw(1):indexDotState(ph)%gamma_tw(2))!, &
+            dot_gamma_tw => dotState(indexDotState(ph)%gamma_tw(1):indexDotState(ph)%gamma_tw(2)), &
             dot_gamma_tw_nucl => dotState(indexDotState(ph)%gamma_tw(1):indexDotState(ph)%gamma_tw(2)), &
             dot_gamma_tw_grow => dotState(indexDotState(ph)%gamma_tw(1):indexDotState(ph)%gamma_tw(2)), &
             dot_xi_tw_nucl => dotState(indexDotState(ph)%xi_tw_nucl(1):indexDotState(ph)%xi_tw_nucl(2)), &
-            dot_xi_tw_grow => dotState(indexDotState(ph)%xi_tw_grow(1):indexDotState(ph)%xi_tw_grow(2))
+            dot_xi_tw_grow => dotState(indexDotState(ph)%xi_tw_grow(1):indexDotState(ph)%xi_tw_grow(2)))
             
     !sumGamma 
     !sumF_nucl
@@ -487,11 +487,11 @@ module function phenopowerlaw_dotState(Mp,ph,en) result(dotState)               
 
     dot_xi_tw_nucl = prm%h_0_tw_sl * sum(stt%gamma_sl(:,en))**prm%c_3 &
               * matmul(prm%h_tw_sl,dot_gamma_sl) &
-            + prm%h_0_tw_tw_nucl * sumF_nucl**prm%c_4 * matmul(prm%h_tw_tw_nucl,dot_gamma_tw)
+            + prm%h_0_tw_tw_nuc * sumF**prm%c_4 * matmul(prm%h_tw_tw_nucl,dot_gamma_tw)   !sumF_grow
             
     dot_xi_tw_grow = prm%h_0_tw_sl * sum(stt%gamma_sl(:,en))**prm%c_3 &
               * matmul(prm%h_tw_sl,dot_gamma_sl) &
-            + prm%h_0_tw_tw_grow * sumF_grow**prm%c_4 * matmul(prm%h_tw_tw_grow,dot_gamma_tw)
+            + prm%h_0_tw_tw_grt * sumF**prm%c_4 * matmul(prm%h_tw_tw_grow,dot_gamma_tw)   !sumF_nucl
 
   end associate
 
