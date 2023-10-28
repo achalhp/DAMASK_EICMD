@@ -383,7 +383,7 @@ end function plastic_phenopowerlaw_init
 !> @details asummes that deformation by dislocation glide affects twinned and untwinned volume
 !  equally (Taylor assumption). Twinning happens only in untwinned volume
 !--------------------------------------------------------------------------------------------------
-pure module subroutine phenopowerlaw_LpAndItsTangent(Lp,dLp_dMp,Mp,ph,en)
+module subroutine phenopowerlaw_LpAndItsTangent(Lp,dLp_dMp,Mp,ph,en)
 
   real(pReal), dimension(3,3),     intent(out) :: &
     Lp                                                                                              !< plastic velocity gradient
@@ -404,6 +404,7 @@ pure module subroutine phenopowerlaw_LpAndItsTangent(Lp,dLp_dMp,Mp,ph,en)
     
   real(pReal), dimension(param(ph)%sum_N_tw) :: &
     dot_gamma_tw,ddot_gamma_dtau_tw 
+  real(pReal), dimension(1) :: fdot_twin_nucl
   Lp = 0.0_pReal
   dLp_dMp = 0.0_pReal
 
@@ -418,7 +419,7 @@ pure module subroutine phenopowerlaw_LpAndItsTangent(Lp,dLp_dMp,Mp,ph,en)
                        + ddot_gamma_dtau_sl_neg(i) * prm%P_sl(k,l,i) * prm%P_nS_neg(m,n,i)
   end do slipSystems
 
-  call kinetics_tw(Mp,ph,en,dot_gamma_tw,ddot_gamma_dtau_tw)
+  call kinetics_tw(Mp,ph,en,dot_gamma_tw,ddot_gamma_dtau_tw,fdot_twin_nucl)
   twinSystems: do i = 1, prm%sum_N_tw
     Lp = Lp + dot_gamma_tw(i)*prm%P_tw(1:3,1:3,i)
     forall (k=1:3,l=1:3,m=1:3,n=1:3) &
@@ -452,8 +453,9 @@ module function phenopowerlaw_dotState(Mp,ph,en) result(dotState)               
     right_SlipSlip
   !real(pReal), dimension(param(ph)%sum_N_tw) :: &
     !fdot_twin_nucl, fdot_twin_grow    dot_xi_tw
+  real(pReal), dimension(1) :: fdot_twin_nucl
 
-    
+
   associate(prm => param(ph), stt => state(ph), &
             dot_xi_sl => dotState(indexDotState(ph)%xi_sl(1):indexDotState(ph)%xi_sl(2)), &
             dot_xi_tw => dotState(indexDotState(ph)%xi_tw(1):indexDotState(ph)%xi_tw(2)), &
@@ -470,7 +472,7 @@ module function phenopowerlaw_dotState(Mp,ph,en) result(dotState)               
 
     call kinetics_sl(Mp,ph,en,dot_gamma_sl_pos,dot_gamma_sl_neg)
     dot_gamma_sl = abs(dot_gamma_sl_pos+dot_gamma_sl_neg)
-    call kinetics_tw(Mp,ph,en,dot_gamma_tw)
+    call kinetics_tw(Mp,ph,en,dot_gamma_tw,fdot_twin_nucl)
 
     sumF = sum(stt%gamma_tw(:,en)/prm%gamma_char)
     xi_sl_sat_offset = prm%f_sat_sl_tw*sqrt(sumF)
@@ -492,6 +494,9 @@ module function phenopowerlaw_dotState(Mp,ph,en) result(dotState)               
     dot_xi_tw_grow = prm%h_0_tw_sl * sum(stt%gamma_sl(:,en))**prm%c_3 &
               * matmul(prm%h_tw_sl,dot_gamma_sl) &
             + prm%h_0_tw_tw_grt * sumF**prm%c_4 * matmul(prm%h_tw_tw_grow,dot_gamma_tw)   !sumF_nucl
+
+    !if(en==4) write(6,*) 'twin volume fraction_1', twin_volume_fraction
+    if(en==4) write(6,*) 'dot_xi_tw_nucl_new', dot_xi_tw_grow
 
   end associate
 
@@ -741,7 +746,7 @@ end subroutine plastic_phenopowerlaw_results
 ! NOTE: Against the common convention, the result (i.e. intent(out)) variables are the last to
 ! have the optional arguments at the end.
 !--------------------------------------------------------------------------------------------------
-pure subroutine kinetics_sl(Mp,ph,en, &
+subroutine kinetics_sl(Mp,ph,en, &
                             dot_gamma_sl_pos,dot_gamma_sl_neg,ddot_gamma_dtau_sl_pos,ddot_gamma_dtau_sl_neg)
 
   real(pReal), dimension(3,3),  intent(in) :: &
@@ -812,8 +817,8 @@ end subroutine kinetics_sl
 ! have the optional arguments at the end.
 ! Mp: Mandel Stress, ph: , en: , dot_gamma_tw: , ddot_gamma_dtau_tw:
 !--------------------------------------------------------------------------------------------------
-pure subroutine kinetics_tw(Mp,ph,en,&
-                            dot_gamma_tw,ddot_gamma_dtau_tw) !fdot_twin_nucl, fdot_twin_grow)
+subroutine kinetics_tw(Mp,ph,en,&
+                            dot_gamma_tw, fdot_twin_nucl,ddot_gamma_dtau_tw) !fdot_twin_nucl, fdot_twin_grow)
 
   real(pReal), dimension(3,3),  intent(in) :: &
     Mp                                                                                              !< Mandel stress
@@ -822,7 +827,7 @@ pure subroutine kinetics_tw(Mp,ph,en,&
     en
 
   real(pReal), dimension(param(ph)%sum_N_tw), intent(out) :: &
-    dot_gamma_tw !fdot_twin_nucl, fdot_twin_grow
+    dot_gamma_tw, fdot_twin_nucl!, fdot_twin_grow
   real(pReal), dimension(param(ph)%sum_N_tw), intent(out), optional :: &
     ddot_gamma_dtau_tw
 
@@ -838,7 +843,7 @@ pure subroutine kinetics_tw(Mp,ph,en,&
     where(tau_tw > 0.0_pReal) !and stt%frozen(en) < 0.9_pReal)
       dot_gamma_tw = (1.0_pReal-sum(stt%gamma_tw(:,en)/prm%gamma_char)) &                           ! only twin in untwinned volume fraction
                    * prm%dot_gamma_0_tw*(abs(tau_tw)/stt%xi_tw(:,en))**prm%n_tw
-      !fdot_twin_nucl = 
+      fdot_twin_nucl = max(sum(stt%gamma_tw(:,en)/prm%gamma_char),1.0_pReal)                        ! allocating volume fraction
       !fdot_twin_nucl = 
     else where
       dot_gamma_tw = 0.0_pReal
@@ -851,6 +856,9 @@ pure subroutine kinetics_tw(Mp,ph,en,&
         ddot_gamma_dtau_tw = 0.0_pReal
       end where
     end if
+
+    !twin_volume_fraction = 1.0_pReal ! max(sum(stt%gamma_tw(:,en)/prm%gamma_char),1.0_pReal) !f_tw
+    if(en==4) write(6,*) "twin volume fraction", sum(stt%gamma_tw(:,en)/prm%gamma_char) !,1.0_pReal)
 
   end associate
 

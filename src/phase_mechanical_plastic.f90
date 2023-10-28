@@ -49,7 +49,7 @@ submodule(phase:mechanical) plastic
         en
     end subroutine isotropic_LpAndItsTangent
 
-    pure module subroutine phenopowerlaw_LpAndItsTangent(Lp,dLp_dMp,Mp,ph,en)
+    module subroutine phenopowerlaw_LpAndItsTangent(Lp,dLp_dMp,Mp,ph,en)                             !removed pure 
       real(pReal), dimension(3,3),     intent(out) :: &
         Lp
       real(pReal), dimension(3,3,3,3), intent(out) :: &
