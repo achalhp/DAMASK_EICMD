@@ -451,10 +451,9 @@ module function phenopowerlaw_dotState(Mp,ph,en) result(dotState)               
   real(pReal), dimension(param(ph)%sum_N_sl) :: &
     dot_gamma_sl_pos,dot_gamma_sl_neg, &
     right_SlipSlip
-  !real(pReal), dimension(param(ph)%sum_N_tw) :: &
-    !fdot_twin_nucl, fdot_twin_grow    dot_xi_tw
-  real(pReal), dimension(1) :: fdot_twin_nucl
-
+  real(pReal), dimension(param(ph)%sum_N_tw) :: &
+    fdot_twin_nucl!, fdot_twin_grow    dot_xi_tw
+  
 
   associate(prm => param(ph), stt => state(ph), &
             dot_xi_sl => dotState(indexDotState(ph)%xi_sl(1):indexDotState(ph)%xi_sl(2)), &
@@ -466,22 +465,30 @@ module function phenopowerlaw_dotState(Mp,ph,en) result(dotState)               
             dot_xi_tw_nucl => dotState(indexDotState(ph)%xi_tw_nucl(1):indexDotState(ph)%xi_tw_nucl(2)), &
             dot_xi_tw_grow => dotState(indexDotState(ph)%xi_tw_grow(1):indexDotState(ph)%xi_tw_grow(2)))
             
-    !sumGamma 
-    !sumF_nucl
-    !sumF_grow
+    !sumGamma = sum(stt%gamma_slip(:,en))
+    !sumF_nucl = sum(stt%f_twin_nucl(:,of))
+    !sumF_grow = sum(stt%f_twin_grow(:,of))
 
+    
     call kinetics_sl(Mp,ph,en,dot_gamma_sl_pos,dot_gamma_sl_neg)
     dot_gamma_sl = abs(dot_gamma_sl_pos+dot_gamma_sl_neg)
     call kinetics_tw(Mp,ph,en,dot_gamma_tw,fdot_twin_nucl)
+    !dotState%f_twin_nucl(:,en) = fdot_twin_nucl
+    !dotState%f_twin_grow(:,en) = fdot_twin_nucl
 
     sumF = sum(stt%gamma_tw(:,en)/prm%gamma_char)
+    !sumF_nucl = sum(stt%f_twin_nucl(:,en)/prm%gamma_char)
+    !sumF_grow = sum(stt%f_twin_grow(:,en)/prm%gamma_char)
     xi_sl_sat_offset = prm%f_sat_sl_tw*sqrt(sumF)
     right_SlipSlip = sign(abs(1.0_pReal-stt%xi_sl(:,en) / (prm%xi_inf_sl+xi_sl_sat_offset))**prm%a_sl, &
                           1.0_pReal-stt%xi_sl(:,en) / (prm%xi_inf_sl+xi_sl_sat_offset))
 
+!--------hardening
+
     dot_xi_sl = prm%h_0_sl_sl * (1.0_pReal + prm%c_1*sumF** prm%c_2) * (1.0_pReal + prm%h_int) &
                 * matmul(prm%h_sl_sl,dot_gamma_sl*right_SlipSlip) &
               + matmul(prm%h_sl_tw,dot_gamma_tw)
+
 !< Rate of change of critical shear stress
     !dot_xi_tw = prm%h_0_tw_sl * sum(stt%gamma_sl(:,en))**prm%c_3 &
     !            * matmul(prm%h_tw_sl,dot_gamma_sl) &
