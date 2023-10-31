@@ -279,13 +279,13 @@ module function plastic_phenopowerlaw_init() result(myPlasticity)               
 ! allocate state arrays
     Nmembers = count(material_phaseID == ph)
     sizeDotState = size(['xi_sl   ','gamma_sl']) * prm%sum_N_sl &
-                 + size(['xi_tw   ','gamma_tw']) * prm%sum_N_tw !&
-                 !+ size(['xi_tw_nucl','xi_tw_grow']) * prm%sum_N_tw &             ! Why not size(['xi_tw_nucl','gamma_tw'])?
+                 + size(['xi_tw   ','gamma_tw']) * prm%sum_N_tw &
+                 + size(['xi_tw_nucl','xi_tw_grow']) * prm%sum_N_tw !&             ! Why not size(['xi_tw_nucl','gamma_tw'])?
                  !+ size(['f_tw_nucl','f_tw_grow']) * prm%sum_N_tw &
                  !+ size(['variant_twin','frozen']) * prm%sum_N_tw &
     sizeState = size(['xi_sl   ','gamma_sl']) * prm%sum_N_sl &
-                 + size(['xi_tw   ','gamma_tw']) * prm%sum_N_tw !&
-                 !+ size(['xi_tw_nucl','xi_tw_grow']) * prm%sum_N_tw &             ! Why not size(['xi_tw_nucl','gamma_tw'])?
+                 + size(['xi_tw   ','gamma_tw']) * prm%sum_N_tw &
+                 + size(['xi_tw_nucl','xi_tw_grow']) * prm%sum_N_tw !&             ! Why not size(['xi_tw_nucl','gamma_tw'])?
                  !+ size(['f_tw_nucl','f_tw_grow']) * prm%sum_N_tw &
                  !+ size(['fmc_tw_nucl','fmc_tw_grow']) * prm%sum_N_tw &
                  !+ size(['variant_twin','frozen']) * prm%sum_N_tw &
