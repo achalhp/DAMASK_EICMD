@@ -512,10 +512,10 @@ end function phenopowerlaw_dotState
 !--------------------------------------------------------------------------------------------------
 !> @brief calculates instantaneous incremental change of kinematics and associated jump state
 !--------------------------------------------------------------------------------------------------
-! module subroutine plastic_kinematic_deltaFp(twin)
-!   use prec, only: &
-!    dNeq, &
-!    dEq0
+module subroutine plastic_kinematic_deltaFp(twinJump,deltaFp,ipc, ip, el)
+   use prec, only: &
+    dNeq, &
+    dEq0
 ! #ifdef DEBUG
 !  use debug, only: &
 !    debug_level, &
@@ -523,58 +523,68 @@ end function phenopowerlaw_dotState
 !    debug_levelExtensive, &
 !    debug_levelSelective
 ! #endif
+  
+  use geometry_plastic_nonlocal, only: &
+    nIPneighbors    => geometry_plastic_nonlocal_nIPneighbors, &
+    IPneighborhood  => geometry_plastic_nonlocal_IPneighborhood, &
+    IPvolume        => geometry_plastic_nonlocal_IPvolume0, &
+    IParea          => geometry_plastic_nonlocal_IParea0, &
+    IPareaNormal    => geometry_plastic_nonlocal_IPareaNormal0
+    
 
-!  use mesh, only: &
-!    mesh_element, &
-!    mesh_ipNeighborhood, &
-!    mesh_ipCoordinates, &
-!    mesh_ipVolume, &
-!    mesh_ipAreaNormal, &
-!    mesh_ipArea, &
-!    FE_NipNeighbors, &
-!    mesh_maxNipNeighbors, &
-!    FE_geomtype, &
-!    FE_celltype
+  !use mesh, only: &
+  !  mesh_element, &                 !name changed
+  !  mesh_ipNeighborhood, &
+  !  mesh_ipCoordinates, &
+  !  mesh_ipVolume, &
+  !  mesh_ipAreaNormal, &
+  !  mesh_ipArea, &
+  !  FE_NipNeighbors, &
+  !  mesh_maxNipNeighbors, &
+  !  FE_geomtype, &
+  !  FE_celltype
 
-!  use lattice
-!  use math, only: &
-!    math_I3
+  use lattice
+  use math, only: &
+    math_I3
 
 !  use material, only: &
-!    phaseAt, phasememberAt, &
+!    phaseAt, phasememberAt, &         !name changed
 !    phase_plasticityInstance
 
-!  implicit none
-!  integer(pInt) :: &
-!    ph, of, instance, & 
-!    neighbor_el, &                                                  !< element number of neighboring material point
-!    neighbor_ip, &                                                  !< integration point of neighboring material point
-!    np, &                                                           !< neighbor phase
-!    no, n                                                           !< nieghbor offset and index for loop at neighbor
+  implicit none
+  integer :: &
+    ph, of, instance, & 
+    neighbor_el, &                                                  !< element number of neighboring material point
+    neighbor_ip, &                                                  !< integration point of neighboring material point
+    np, &                                                           !< neighbor phase
+    no, n                                                           !< nieghbor offset and index for loop at neighbor
 
-!  integer(pInt),                intent(in)  :: &       
-!    el, &                                                           !< element index
-!    ip, &                                                           !< integration point index
-!    ipc                                                             !< grain index
-!  real(pReal), dimension(3,3),  intent(out) :: &
-!    deltaFp                                                                                             
-!  logical ,                     intent(out) :: &
-!    twinJump
+  logical ,                     intent(out) :: &
+    twinJump
+
+  real(pReal), dimension(3,3),  intent(out) :: &
+    deltaFp                                                                                             
+
+  integer,                intent(in)  :: &       
+    ipc, &                                                           !< element index
+    ip, &                                                            !< integration point index
+    el                                                               !< grain index
 ! !  real(pReal), dimension(3,3,param(instance)%totalNslip) :: &
 ! !    CorrespondanceMatrix 
-!  integer(pInt), dimension(52) :: &
-!    twin_el_incl         
-!  real(pReal), dimension(6)     :: &
-!    neighbor_stt                  
-!  real(pReal)   :: &
-!    random, random1
-!  integer(pInt) :: &
-!    i,j,var_growth,var_nucl
-!  var_growth = 0_pInt
-!  var_nucl   = 0_pInt
-!  ph       = phaseAt(ipc, ip, el)
-!  of       = phasememberAt(ipc, ip, el)
-!  instance = phase_plasticityInstance(ph)     
+  integer, dimension(52) :: &
+    twin_el_incl         
+  real(pReal), dimension(6)     :: &
+    neighbor_stt                  
+  real(pReal)   :: &
+    random, random1
+  integer :: &
+    i,j,var_growth,var_nucl
+  var_growth = 0
+  var_nucl   = 0
+  !ph       = phaseAt(ipc, ip, el)
+  !of       = phasememberAt(ipc, ip, el)
+  !instance = phase_plasticityInstance(ph)     
 
 !  associate(prm => param(instance), stt => state(instance), dlt => deltaState(instance))
 
@@ -661,7 +671,7 @@ end function phenopowerlaw_dotState
 ! !   endif Sampling
 !  end associate
     
-! end subroutine plastic_kinematic_deltaFp
+end subroutine plastic_kinematic_deltaFp
 
 !--------------------------------------------------------------------------------------------------
 !> @brief calculates (instantaneous) incremental change of microstructure
