@@ -280,18 +280,18 @@ module function plastic_phenopowerlaw_init() result(myPlasticity)               
     Nmembers = count(material_phaseID == ph)
     sizeDotState = size(['xi_sl   ','gamma_sl']) * prm%sum_N_sl &
                  + size(['xi_tw   ','gamma_tw']) * prm%sum_N_tw &
-                 + size(['xi_tw_nucl','xi_tw_grow']) * prm%sum_N_tw !&             ! Why not size(['xi_tw_nucl','gamma_tw'])?
+                 + size(['xi_tw_nucl','xi_tw_grow']) * prm%sum_N_tw !&                              ! Achal Why not size(['xi_tw_nucl','gamma_tw'])?
                  !+ size(['f_tw_nucl','f_tw_grow']) * prm%sum_N_tw &
                  !+ size(['variant_twin','frozen']) * prm%sum_N_tw &
     sizeState = size(['xi_sl   ','gamma_sl']) * prm%sum_N_sl &
                  + size(['xi_tw   ','gamma_tw']) * prm%sum_N_tw &
-                 + size(['xi_tw_nucl','xi_tw_grow']) * prm%sum_N_tw !&             ! Why not size(['xi_tw_nucl','gamma_tw'])?
-                 !+ size(['f_tw_nucl','f_tw_grow']) * prm%sum_N_tw &
-                 !+ size(['fmc_tw_nucl','fmc_tw_grow']) * prm%sum_N_tw &
-                 !+ size(['variant_twin','frozen']) * prm%sum_N_tw &
+                 + size(['xi_tw_nucl','xi_tw_grow']) * prm%sum_N_tw !&                              ! Achal Why not size(['xi_tw_nucl','gamma_tw'])?
+                 !+ size(['f_tw_nucl','f_tw_grow']) * prm%sum_N_tw &                                !Achal
+                 !+ size(['fmc_tw_nucl','fmc_tw_grow']) * prm%sum_N_tw &                            !Achal
+                 !+ size(['variant_twin','frozen']) * prm%sum_N_tw &                                !Achal
 
     call phase_allocateState(plasticState(ph),Nmembers,sizeState,sizeDotState,0)
-    deallocate(plasticState(ph)%dotState) ! ToDo: remove dotState completely
+    deallocate(plasticState(ph)%dotState)                                                           ! ToDo: remove dotState completely
 
 !--------------------------------------------------------------------------------------------------
 ! state aliases and initialization
@@ -323,19 +323,19 @@ module function plastic_phenopowerlaw_init() result(myPlasticity)               
     stt%gamma_tw => plasticState(ph)%state(startIndex:endIndex,:)
     plasticState(ph)%atol(startIndex:endIndex) = pl%get_asFloat('atol_gamma',defaultVal=1.0e-6_pReal)
 
-    startIndex = endIndex + 1
-    endIndex   = endIndex + prm%sum_N_tw
-    idx_dot%xi_tw_nucl = [startIndex,endIndex]
-    stt%xi_tw_nucl => plasticState(ph)%state(startIndex:endIndex,:)
-    stt%xi_tw_nucl =  spread(xi_0_tw, 2, Nmembers)
-    plasticState(ph)%atol(startIndex:endIndex) = pl%get_asFloat('atol_gamma',defaultVal=1.0e-6_pReal)
+    startIndex = endIndex + 1                                                                          !Achal
+    endIndex   = endIndex + prm%sum_N_tw                                                               !Achal
+    idx_dot%xi_tw_nucl = [startIndex,endIndex]                                                         !Achal
+    stt%xi_tw_nucl => plasticState(ph)%state(startIndex:endIndex,:)                                    !Achal
+    stt%xi_tw_nucl =  spread(xi_0_tw, 2, Nmembers)                                                     !Achal
+    plasticState(ph)%atol(startIndex:endIndex) = pl%get_asFloat('atol_gamma',defaultVal=1.0e-6_pReal)  !Achal
 
-    startIndex = endIndex + 1
-    endIndex   = endIndex + prm%sum_N_tw
-    idx_dot%xi_tw_grow = [startIndex,endIndex]
-    stt%xi_tw_grow => plasticState(ph)%state(startIndex:endIndex,:)
-    stt%xi_tw_grow =  spread(xi_0_tw, 2, Nmembers)
-    plasticState(ph)%atol(startIndex:endIndex) = pl%get_asFloat('atol_gamma',defaultVal=1.0e-6_pReal)
+    startIndex = endIndex + 1                                                                          !Achal
+    endIndex   = endIndex + prm%sum_N_tw                                                               !Achal
+    idx_dot%xi_tw_grow = [startIndex,endIndex]                                                         !Achal
+    stt%xi_tw_grow => plasticState(ph)%state(startIndex:endIndex,:)                                    !Achal
+    stt%xi_tw_grow =  spread(xi_0_tw, 2, Nmembers)                                                     !Achal
+    plasticState(ph)%atol(startIndex:endIndex) = pl%get_asFloat('atol_gamma',defaultVal=1.0e-6_pReal)  !Achal
 
     !startIndex = endIndex + 1
     !endIndex   = endIndex + prm%sum_N_tw
@@ -601,7 +601,7 @@ module subroutine plastic_kinematic_deltaFp(twinJump,deltaFp,ipc, ip, el)
 ! !  enddo TwinLooptest
 
 
-! !Saving the neighbor information in an array
+ !Saving the neighbor information in an array
 !  NeighborLoop1: do n = 1_pInt,FE_NipNeighbors(FE_celltype(FE_geomtype(mesh_element(2,el))))                ! only 4 neighbors for quasi 2D (1 element in z direction)           
 !     neighbor_el = mesh_ipNeighborhood(1,n,ip,el)
 !     neighbor_ip = mesh_ipNeighborhood(2,n,ip,el)
