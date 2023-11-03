@@ -88,15 +88,15 @@ submodule(phase:plastic) phenopowerlaw
       xi_tw, &                                                                                      !< critical shear stress for twin
       gamma_sl, &                                                                                   !< shear strain due to slip
       gamma_tw, &                                                                                   !< shear strain due to twin
-      xi_tw_nucl, &
-      xi_tw_grow, &
-      f_tw_nucl, &
-      f_tw_grow, &
-      fmc_tw_nucl, &
-      fmc_tw_grwo
-    !real(pReal),  pointer, dimension(:) :: &
-    !  variant_twin, &                                                                               !< flag used to assign twin variant
-    !  frozen                                                                                        !< 0 to 1
+      xi_tw_nucl, &                                                                                 !< Achal
+      xi_tw_grow, &                                                                                 !< Achal
+      f_tw_nucl, &                                                                                  !< Achal
+      f_tw_grow, &                                                                                  !< Achal
+      fmc_tw_nucl, &                                                                                !< Achal
+      fmc_tw_grwo                                                                                   !< Achal
+    real(pReal),  pointer, dimension(:) :: &
+      variant_twin, &                                                                               !< flag used to assign twin variant
+      frozen                                                                                        !< 0 to 1
       
   end type tPhenopowerlawState
 
@@ -217,10 +217,10 @@ module function plastic_phenopowerlaw_init() result(myPlasticity)               
       prm%P_tw     = lattice_SchmidMatrix_twin(N_tw,phase_lattice(ph),phase_cOverA(ph))
       prm%h_tw_tw  = lattice_interaction_TwinByTwin(N_tw,pl%get_as1dFloat('h_tw-tw'),phase_lattice(ph))
       prm%gamma_char = lattice_characteristicShear_twin(N_tw,phase_lattice(ph),phase_cOverA(ph))
-      prm%h_tw_tw_nucl = lattice_interaction_TwinByTwin(N_tw,pl%get_as1dFloat('h_tw-tw'),phase_lattice(ph))
-      prm%h_tw_tw_grow = lattice_interaction_TwinByTwin(N_tw,pl%get_as1dFloat('h_tw-tw'),phase_lattice(ph))
-      !prm%chkstep_nucl = 
-      !prm%chkstep_grow =
+      prm%h_tw_tw_nucl = lattice_interaction_TwinByTwin(N_tw,pl%get_as1dFloat('h_tw-tw'),phase_lattice(ph))                     !< Achal
+      prm%h_tw_tw_grow = lattice_interaction_TwinByTwin(N_tw,pl%get_as1dFloat('h_tw-tw'),phase_lattice(ph))                     !< Achal
+      !prm%chkstep_nucl =                                                                                                       !< Achal
+      !prm%chkstep_grow =                                                                                                       !< Achal
       !prm%chkgrowth_twin = 
       !prm%twin_inclusion =
       !prm%prefdecay_slip = 
@@ -248,8 +248,8 @@ module function plastic_phenopowerlaw_init() result(myPlasticity)               
       xi_0_tw = emptyRealArray
       allocate(prm%gamma_char,source=emptyRealArray)
       allocate(prm%h_tw_tw(0,0))
-      allocate(prm%h_tw_tw_nucl(0,0))
-      allocate(prm%h_tw_tw_grow(0,0))
+      allocate(prm%h_tw_tw_nucl(0,0))                                                                                             !< Achal
+      allocate(prm%h_tw_tw_grow(0,0))                                                                                             !< Achal
     end if twinActive
 
 !--------------------------------------------------------------------------------------------------
@@ -280,13 +280,13 @@ module function plastic_phenopowerlaw_init() result(myPlasticity)               
     Nmembers = count(material_phaseID == ph)
     sizeDotState = size(['xi_sl   ','gamma_sl']) * prm%sum_N_sl &
                  + size(['xi_tw   ','gamma_tw']) * prm%sum_N_tw &
-                 + size(['xi_tw_nucl','xi_tw_grow']) * prm%sum_N_tw !&                              ! Achal Why not size(['xi_tw_nucl','gamma_tw'])?
-                 !+ size(['f_tw_nucl','f_tw_grow']) * prm%sum_N_tw &
+                 + size(['xi_tw_nucl','xi_tw_grow']) * prm%sum_N_tw &                              ! Achal Why not size(['xi_tw_nucl','gamma_tw'])?
+                 + size(['f_tw_nucl','f_tw_grow']) * prm%sum_N_tw !&
                  !+ size(['variant_twin','frozen']) * prm%sum_N_tw &
     sizeState = size(['xi_sl   ','gamma_sl']) * prm%sum_N_sl &
                  + size(['xi_tw   ','gamma_tw']) * prm%sum_N_tw &
-                 + size(['xi_tw_nucl','xi_tw_grow']) * prm%sum_N_tw !&                              ! Achal Why not size(['xi_tw_nucl','gamma_tw'])?
-                 !+ size(['f_tw_nucl','f_tw_grow']) * prm%sum_N_tw &                                !Achal
+                 + size(['xi_tw_nucl','xi_tw_grow']) * prm%sum_N_tw &                              ! Achal Why not size(['xi_tw_nucl','gamma_tw'])?
+                 + size(['f_tw_nucl','f_tw_grow']) * prm%sum_N_tw   !&                              !Achal
                  !+ size(['fmc_tw_nucl','fmc_tw_grow']) * prm%sum_N_tw &                            !Achal
                  !+ size(['variant_twin','frozen']) * prm%sum_N_tw &                                !Achal
 
@@ -452,7 +452,7 @@ module function phenopowerlaw_dotState(Mp,ph,en) result(dotState)               
     dot_gamma_sl_pos,dot_gamma_sl_neg, &
     right_SlipSlip
   real(pReal), dimension(param(ph)%sum_N_tw) :: &
-    fdot_twin_nucl!, fdot_twin_grow    dot_xi_tw
+    fdot_twin_nucl, fdot_twin_grow,   dot_xi_tw
   
 
   associate(prm => param(ph), stt => state(ph), &
@@ -460,10 +460,10 @@ module function phenopowerlaw_dotState(Mp,ph,en) result(dotState)               
             dot_xi_tw => dotState(indexDotState(ph)%xi_tw(1):indexDotState(ph)%xi_tw(2)), &
             dot_gamma_sl => dotState(indexDotState(ph)%gamma_sl(1):indexDotState(ph)%gamma_sl(2)), &
             dot_gamma_tw => dotState(indexDotState(ph)%gamma_tw(1):indexDotState(ph)%gamma_tw(2)), &
-            dot_gamma_tw_nucl => dotState(indexDotState(ph)%gamma_tw(1):indexDotState(ph)%gamma_tw(2)), &
-            dot_gamma_tw_grow => dotState(indexDotState(ph)%gamma_tw(1):indexDotState(ph)%gamma_tw(2)), &
-            dot_xi_tw_nucl => dotState(indexDotState(ph)%xi_tw_nucl(1):indexDotState(ph)%xi_tw_nucl(2)), &
-            dot_xi_tw_grow => dotState(indexDotState(ph)%xi_tw_grow(1):indexDotState(ph)%xi_tw_grow(2)))
+            dot_gamma_tw_nucl => dotState(indexDotState(ph)%gamma_tw(1):indexDotState(ph)%gamma_tw(2)), &              !< Achal
+            dot_gamma_tw_grow => dotState(indexDotState(ph)%gamma_tw(1):indexDotState(ph)%gamma_tw(2)), &              !< Achal
+            dot_xi_tw_nucl => dotState(indexDotState(ph)%xi_tw_nucl(1):indexDotState(ph)%xi_tw_nucl(2)), &             !< Achal
+            dot_xi_tw_grow => dotState(indexDotState(ph)%xi_tw_grow(1):indexDotState(ph)%xi_tw_grow(2)))               !< Achal
             
     !sumGamma = sum(stt%gamma_slip(:,en))
     !sumF_nucl = sum(stt%f_twin_nucl(:,of))
@@ -490,17 +490,17 @@ module function phenopowerlaw_dotState(Mp,ph,en) result(dotState)               
               + matmul(prm%h_sl_tw,dot_gamma_tw)
 
 !< Rate of change of critical shear stress
-    !dot_xi_tw = prm%h_0_tw_sl * sum(stt%gamma_sl(:,en))**prm%c_3 &
-    !            * matmul(prm%h_tw_sl,dot_gamma_sl) &
-    !          + prm%h_0_tw_tw * sumF**prm%c_4 * matmul(prm%h_tw_tw,dot_gamma_tw)
+    dot_xi_tw = prm%h_0_tw_sl * sum(stt%gamma_sl(:,en))**prm%c_3 &
+                * matmul(prm%h_tw_sl,dot_gamma_sl) &
+              + prm%h_0_tw_tw * sumF**prm%c_4 * matmul(prm%h_tw_tw,dot_gamma_tw)
 
     dot_xi_tw_nucl = prm%h_0_tw_sl * sum(stt%gamma_sl(:,en))**prm%c_3 &
               * matmul(prm%h_tw_sl,dot_gamma_sl) &
-            + prm%h_0_tw_tw_nuc * sumF**prm%c_4 * matmul(prm%h_tw_tw_nucl,dot_gamma_tw)   !sumF_grow
+            + prm%h_0_tw_tw_nuc * sumF**prm%c_4 * matmul(prm%h_tw_tw_nucl,dot_gamma_tw)                                !Achal, need to add sumF_grow instead of sumF
             
     dot_xi_tw_grow = prm%h_0_tw_sl * sum(stt%gamma_sl(:,en))**prm%c_3 &
               * matmul(prm%h_tw_sl,dot_gamma_sl) &
-            + prm%h_0_tw_tw_grt * sumF**prm%c_4 * matmul(prm%h_tw_tw_grow,dot_gamma_tw)   !sumF_nucl
+            + prm%h_0_tw_tw_grt * sumF**prm%c_4 * matmul(prm%h_tw_tw_grow,dot_gamma_tw)                                !Achal, need to add sumF_nucl instead of sumF
 
     !if(en==4) write(6,*) 'twin volume fraction_1', twin_volume_fraction
     if(en==4) write(6,*) 'dot_xi_tw_nucl_new', dot_xi_tw_grow
@@ -603,11 +603,11 @@ module subroutine plastic_kinematic_deltaFp(twinJump,deltaFp,ipc, ip, el)
 
  !Saving the neighbor information in an array
 !  NeighborLoop1: do n = 1_pInt,FE_NipNeighbors(FE_celltype(FE_geomtype(mesh_element(2,el))))                ! only 4 neighbors for quasi 2D (1 element in z direction)           
-!     neighbor_el = mesh_ipNeighborhood(1,n,ip,el)
-!     neighbor_ip = mesh_ipNeighborhood(2,n,ip,el)
-!     np = phaseAt(1,neighbor_ip,neighbor_el)
-!     no = phasememberAt(1,neighbor_ip,neighbor_el)
-!     neighbor_stt(n) = state(phase_plasticityInstance(np))%variant_twin(no)
+!     neighbor_el = mesh_ipNeighborhood(1,n,ip,el)                                                           ! Integer
+!     neighbor_ip = mesh_ipNeighborhood(2,n,ip,el)                                                           ! Integer
+!     np = phaseAt(1,neighbor_ip,neighbor_el)                                                                ! Integer
+!     no = phasememberAt(1,neighbor_ip,neighbor_el)                                                          ! Integer
+!     neighbor_stt(n) = state(phase_plasticityInstance(np))%variant_twin(no)                                 ! Integer
 !  enddo NeighborLoop1
  
 ! !checking if any of my neighbor is twinned if yes recognize the variant and exit
@@ -860,7 +860,7 @@ subroutine kinetics_tw(Mp,ph,en,&
     where(tau_tw > 0.0_pReal) !and stt%frozen(en) < 0.9_pReal)
       dot_gamma_tw = (1.0_pReal-sum(stt%gamma_tw(:,en)/prm%gamma_char)) &                           ! only twin in untwinned volume fraction
                    * prm%dot_gamma_0_tw*(abs(tau_tw)/stt%xi_tw(:,en))**prm%n_tw
-      fdot_twin_nucl = max(sum(stt%gamma_tw(:,en)/prm%gamma_char),1.0_pReal)                        ! allocating volume fraction
+      fdot_twin_nucl = max(sum(stt%gamma_tw(:,en)/prm%gamma_char),1.0_pReal)                        ! Achal allocating volume fraction
       !fdot_twin_nucl = 
     else where
       dot_gamma_tw = 0.0_pReal
