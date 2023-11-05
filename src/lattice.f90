@@ -2283,4 +2283,67 @@ subroutine selfTest
 
 end subroutine selfTest
 
+!--------------------------------------------------------------------------------------------------
+!> @brief correspondance matrix for twinning
+!> details only active twin systems are considered
+!--------------------------------------------------------------------------------------------------
+function lattice_CorrespondanceMatrix_twin(Ntwin,structure,cOverA) result(CorrespondanceMatrix)
+  use prec, only: &
+    tol_math_check
+  use IO, only: &
+    IO_error
+  use math, only: &
+    math_mul3333xx33, &
+    math_axisAngleToR, &
+    INRAD, &
+    math_I3
+  
+  implicit none
+  integer,    dimension(:),            intent(in) :: Ntwin                                     !< number of active twin systems per family
+  character(len=*),                          intent(in) :: structure                                 !< lattice structure
+  real(pReal),                               intent(in) :: cOverA                                    !< c/a ratio
+  real(pReal),     dimension(3,3,sum(Ntwin))            :: CorrespondanceMatrix
+
+  real(pReal),     dimension(3,3,sum(Ntwin))            :: coordinateSystem
+  real(pReal),     dimension(sum(Ntwin))                :: characteristicShearTwin
+  real(pReal),     dimension(3,3,sum(Ntwin))            :: SchmidMatrixTwin
+  real(pReal),     dimension(:,:), allocatable          :: twinSystems
+  integer,   dimension(:),   allocatable          :: NtwinMax
+  integer :: i
+
+  if (len_trim(structure) /= 3) &
+    call IO_error(137,ext_msg='lattice_CorrespondanceMatrix_twin: '//trim(structure))
+
+  select case(structure(1:3))
+    case('fcc')
+      NtwinMax    = CF_NTWINSYSTEM
+      twinSystems = CF_SYSTEMTWIN
+    case('bcc')
+      NtwinMax    = CI_NTWINSYSTEM
+      twinSystems = CI_SYSTEMTWIN
+    case('hex')
+      NtwinMax    = HP_NTWINSYSTEM
+      twinSystems = HP_SYSTEMTWIN                                                              !< the twin system matrix is different from V2.0
+    case default
+      call IO_error(137,ext_msg='lattice_CorrespondanceMatrix_twin: '//trim(structure))
+  end select
+
+  if (any(NtwinMax(1:size(Ntwin)) - Ntwin < 0)) &
+    call IO_error(145,ext_msg='Ntwin '//trim(structure))
+  if (any(Ntwin < 0)) &
+    call IO_error(144,ext_msg='Ntwin '//trim(structure))
+
+  coordinateSystem        =  buildCoordinateSystem(Ntwin,NtwinMax,twinSystems,structure,cOverA)
+  !  characteristicShearTwin =  0.0_pReal*lattice_characteristicShear_Twin(Ntwin,structure,cOverA)          ! for removing shear from CorrespondanceMatrix
+  characteristicShearTwin =  lattice_characteristicShear_Twin(Ntwin,structure,cOverA)
+  SchmidMatrixTwin        =  lattice_SchmidMatrix_twin(Ntwin,structure,cOverA)
+
+  do i = 1, sum(Ntwin)
+    CorrespondanceMatrix(1:3,1:3,i) = math_mul3333xx33(math_axisAngleToR(coordinateSystem(1:3,2,i), &
+                                      180.0_pReal*INRAD), MATH_I3 + characteristicShearTwin(i)* &
+                                      SchmidMatrixTwin(1:3,1:3,i))
+  enddo
+
+end function lattice_CorrespondanceMatrix_twin
+
 end module lattice
