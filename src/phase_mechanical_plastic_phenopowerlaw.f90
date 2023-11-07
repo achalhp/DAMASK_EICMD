@@ -29,7 +29,8 @@ submodule(phase:plastic) phenopowerlaw
       h_sl_sl, &                                                                                    !< slip resistance from slip activity
       h_sl_tw, &                                                                                    !< slip resistance from twin activity
       h_tw_sl, &                                                                                    !< twin resistance from slip activity
-      h_tw_tw                                                                                       !< twin resistance from twin activity
+      h_tw_tw , &
+      CorrespondanceMatrix                                                                                     !< twin resistance from twin activity
     real(pReal),               allocatable, dimension(:,:,:) :: &
       P_sl, &
       P_tw, &
@@ -177,6 +178,7 @@ module function plastic_phenopowerlaw_init() result(myPlasticity)
       prm%P_tw     = lattice_SchmidMatrix_twin(N_tw,phase_lattice(ph),phase_cOverA(ph))
       prm%h_tw_tw  = lattice_interaction_TwinByTwin(N_tw,pl%get_as1dFloat('h_tw-tw'),phase_lattice(ph))
       prm%gamma_char = lattice_characteristicShear_twin(N_tw,phase_lattice(ph),phase_cOverA(ph))
+      prm%CorrespondanceMatrix = lattice_CorrespondanceMatrix_twin(N_tw,phase_lattice(ph),phase_cOverA(ph))
 
       xi_0_tw             = pl%get_as1dFloat('xi_0_tw',requiredSize=size(N_tw))
 
