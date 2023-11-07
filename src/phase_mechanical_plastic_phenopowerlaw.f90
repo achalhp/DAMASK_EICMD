@@ -29,13 +29,14 @@ submodule(phase:plastic) phenopowerlaw
       h_sl_sl, &                                                                                    !< slip resistance from slip activity
       h_sl_tw, &                                                                                    !< slip resistance from twin activity
       h_tw_sl, &                                                                                    !< twin resistance from slip activity
-      h_tw_tw , &
-      CorrespondanceMatrix                                                                                     !< twin resistance from twin activity
+      h_tw_tw                                                                                       !< twin resistance from twin activity
+                                                                                           
     real(pReal),               allocatable, dimension(:,:,:) :: &
       P_sl, &
       P_tw, &
       P_nS_pos, &
-      P_nS_neg
+      P_nS_neg, &
+      CorrespondanceMatrix                                                                         
     integer :: &
       sum_N_sl, &                                                                                   !< total number of active slip system
       sum_N_tw                                                                                      !< total number of active twin systems
