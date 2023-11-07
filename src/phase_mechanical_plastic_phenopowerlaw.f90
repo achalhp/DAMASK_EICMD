@@ -67,7 +67,7 @@ submodule(phase:plastic) phenopowerlaw
 ! containers for parameters, dot state index,  and state
   type(tParameters),         allocatable, dimension(:) :: param
   type(tIndexDotState),      allocatable, dimension(:) :: indexDotState
-  type(tPhenopowerlawState), allocatable, dimension(:) :: state
+  type(tPhenopowerlawState), allocatable, dimension(:) :: state, dot_state, deltastate
 
 contains
 
@@ -420,81 +420,54 @@ module subroutine plastic_kinematic_deltaFp(twinJump,deltaFp,ipc, ip, el)
 !    phaseAt, phasememberAt, &         !name changed
 !    phase_plasticityInstance
 
- implicit none
- integer :: &
-   ph, of, instance, & 
-   neighbor_el, &                                                  !< element number of neighboring material point
-   neighbor_ip, &                                                  !< integration point of neighboring material point
-   np, &                                                           !< neighbor phase
-   no, n                                                           !< nieghbor offset and index for loop at neighbor
+  implicit none
+  integer :: &
+    ph, en, instance, &                                             !< 'of' is 'en'
+    neighbor_el, &                                                  !< element number of neighboring material point
+    neighbor_ip, &                                                  !< integration point of neighboring material point
+    np, &                                                           !< neighbor phase
+    no, n                                                           !< nieghbor offset and index for loop at neighbor
 
- logical ,                     intent(out) :: &
-   twinJump
+  logical ,                     intent(out) :: &
+    twinJump
 
- real(pReal), dimension(3,3),  intent(out) :: &
-   deltaFp                                                                                             
+  real(pReal), dimension(3,3),  intent(out) :: &
+    deltaFp                                                                                             
 
- integer,                intent(in)  :: &       
-   ipc, &                                                           !< element index
-   ip, &                                                            !< integration point index
-   el                                                               !< grain index
+  integer,                intent(in)  :: &       
+    ipc, &                                                           !< element index
+    ip, &                                                            !< integration point index
+    el                                                               !< grain index
 ! !  real(pReal), dimension(3,3,param(instance)%totalNslip) :: &
 ! !    CorrespondanceMatrix 
- integer, dimension(52) :: &
-   twin_el_incl         
- real(pReal), dimension(6)     :: &
-   neighbor_stt                  
- real(pReal)   :: &
-   random, random1
- integer :: &
-   i,j,var_growth,var_nucl
- var_growth = 0
- var_nucl   = 0
+  integer, dimension(52) :: &
+    twin_el_incl         
+  real(pReal), dimension(6)     :: &
+    neighbor_stt                  
+  real(pReal)   :: &
+    random, random1
+  integer :: &
+    i,j,var_growth,var_nucl
+  var_growth = 0
+  var_nucl   = 0
  !ph       = phaseAt(ipc, ip, el)
  !of       = phasememberAt(ipc, ip, el)
  !instance = phase_plasticityInstance(ph)     
 
-!  associate(prm => param(instance), stt => state(instance), dlt => deltaState(instance))
+  associate(prm => param(instance), stt => state(instance), dlt => deltaState(instance))
 
-!  twinJump = .false.
-!  deltaFp  = math_I3
-
-! ! for eshelby circular inclusion
-!  twin_el_incl = (/ 10913,10914,10915,10916,10917,10918,10919,10920,10921,10922,10923,10924,10925, &
-!                    10993,10994,10995,10996,10997,10998,10999,11000,11001,11002,11074,11075,11076, &
-!                    11077,11078,11079,10751,10752,10753,10754,10755,10756,10757,10758,10759,10760, &
-!                    10670,10671,10672,10673,10674,10675,10676,10677,10678,10679,10680,10681,10682 /)
-! !  TwinLooptest: do i=1_pInt, prm%totalNtwin
-! !     write(6,*)'CorrespondenceMatrix for system',i, prm%CorrespondanceMatrix(:,:,i)
-! !  enddo TwinLooptest
+  twinJump = .false.
+  deltaFp  = math_I3
 
 
-!Saving the neighbor information in an array
-!  NeighborLoop1: do n = 1_pInt,FE_NipNeighbors(FE_celltype(FE_geomtype(mesh_element(2,el))))                ! only 4 neighbors for quasi 2D (1 element in z direction)           
-!     neighbor_el = mesh_ipNeighborhood(1,n,ip,el)                                                           ! Integer
-!     neighbor_ip = mesh_ipNeighborhood(2,n,ip,el)                                                           ! Integer
-!     np = phaseAt(1,neighbor_ip,neighbor_el)                                                                ! Integer
-!     no = phasememberAt(1,neighbor_ip,neighbor_el)                                                          ! Integer
-!     neighbor_stt(n) = state(phase_plasticityInstance(np))%variant_twin(no)                                 ! Integer
-!  enddo NeighborLoop1
+  call RANDOM_NUMBER(random)
+  !call RANDOM_NUMBER(random1)
 
-! !checking if any of my neighbor is twinned if yes recognize the variant and exit
-! !  NeighborLoop2: do n = 1_pInt,FE_NipNeighbors(FE_celltype(FE_geomtype(mesh_element(2,el))))                ! only 4 neighbors for quasi 2D (1 element in z direction)           
-! !     neighbor_el = mesh_ipNeighborhood(1,n,ip,el)
-! !     neighbor_ip = mesh_ipNeighborhood(2,n,ip,el)
-! !     np = phaseAt(1,neighbor_ip,neighbor_el)
-! ! !     if(of == 1) write(6,*)'phaseAt neighbor_ip of neighbor_el', np      
-! !     no = phasememberAt(1,neighbor_ip,neighbor_el)
-! ! !     if(of == 1) write(6,*)'phasememberAt at neighbor_ip of neighbor_el', no
-! !     if (state(phase_plasticityInstance(np))%variant_twin(no) > 0_pInt) then
-! !         var_growth = state(phase_plasticityInstance(np))%variant_twin(no)
-! ! 
-! !         exit NeighborLoop2
-! !     endif       
-! !  enddo NeighborLoop2
-
-!  call RANDOM_NUMBER(random)
-!  call RANDOM_NUMBER(random1)
+  Success_Growth: if (random <= sum(state(ph)%gamma_tw(:,en)/param(ph)%gamma_char)) then
+    twinJump = .true.
+    deltaFp  = prm%CorrespondanceMatrix(:,:,var_growth)
+    
+  end if Success_Growth
 ! !   Sampling: if (var_growth > 0_pInt) then
 ! ! !     write(6,*)'I am sampling for growth with variant',var_growth
 ! !     Ability_Growth: if (stt%f_twin_grow(var_growth,of) > stt%fmc_twin_grow(var_growth,of) &
@@ -537,9 +510,52 @@ module subroutine plastic_kinematic_deltaFp(twinJump,deltaFp,ipc, ip, el)
 !     endif Ability_Nucleation
 !   endif
 ! !   endif Sampling
-!  end associate
+  end associate
    
 end subroutine plastic_kinematic_deltaFp
+
+!--------------------------------------------------------------------------------------------------
+!> @brief calculates (instantaneous) incremental change of microstructure
+!--------------------------------------------------------------------------------------------------
+subroutine plastic_phenopowerlaw_deltaState(instance,of)
+  use prec, only: &
+    dNeq, &
+    dEq0
+!  #ifdef DEBUG
+!   use debug, only: &
+!     debug_level, &
+!     debug_constitutive,&
+!     debug_levelExtensive, &
+!     debug_levelSelective
+!  #endif
+ 
+  implicit none
+  integer,                intent(in) :: &
+    instance, &
+    of
+ 
+  associate(prm => param(instance), stt => state(instance), dlt => deltaState(instance))
+ 
+!  #ifdef DEBUG
+!   if (iand(debug_level(debug_constitutive), debug_levelExtensive) /= 0_pInt &
+!              .and. (of == prm%of_debug &
+!                     .or. .not. iand(debug_level(debug_constitutive),debug_levelSelective) /= 0_pInt)) then
+!     write(6,'(a)') '======= phenopowerlaw delta state ======='
+!  !    write(6,*) sense,state(instance)%sense(:,of)
+!   endif
+!  #endif
+ 
+ !--------------------------------------------------------------------------------------------------
+    !dlt%f_twin_nucl(:,of)       = 0.0_pReal
+    !dlt%f_twin_grow(:,of)       = 0.0_pReal
+    !dlt%fmc_twin_nucl(:,of)     = 0.0_pReal
+    !dlt%fmc_twin_grow(:,of)     = 0.0_pReal
+    !dlt%frozen(of)              = 0.0_pReal              
+    !dlt%variant_twin(of)        = 0.0_pInt              
+  
+  end associate
+ 
+ end subroutine plastic_phenopowerlaw_deltaState
 
 !--------------------------------------------------------------------------------------------------
 !> @brief Write results to HDF5 output file.
