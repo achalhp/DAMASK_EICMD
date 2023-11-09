@@ -425,7 +425,7 @@ module subroutine plastic_kinematic_deltaFp(twinJump,deltaFp,ipc, ip, el)
 
   implicit none
   integer :: &
-    ph, en, instance, &                                             !< 'of' is 'en'
+    ph, en, instance, &                                             !< 'en' is size of FFT grid 8*8*8 or 16*16*16.
     neighbor_el, &                                                  !< element number of neighboring material point
     neighbor_ip, &                                                  !< integration point of neighboring material point
     np, &                                                           !< neighbor phase
@@ -440,7 +440,7 @@ module subroutine plastic_kinematic_deltaFp(twinJump,deltaFp,ipc, ip, el)
   integer,                intent(in)  :: &       
     ipc, &                                                           !< element index
     ip, &                                                            !< integration point index
-    el                                                               !< grain index
+    el                                                               !< grain index  @ for identifying grain boundary
 ! !  real(pReal), dimension(3,3,param(instance)%totalNslip) :: &
 ! !    CorrespondanceMatrix 
   integer, dimension(52) :: &
