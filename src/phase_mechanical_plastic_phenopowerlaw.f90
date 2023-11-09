@@ -380,141 +380,45 @@ module function phenopowerlaw_dotState(Mp,ph,en) result(dotState)
 
 end function phenopowerlaw_dotState
 
+
 !--------------------------------------------------------------------------------------------------
 !> @brief calculates instantaneous incremental change of kinematics and associated jump state
 !--------------------------------------------------------------------------------------------------
-module subroutine plastic_kinematic_deltaFp(twinJump,deltaFp,ipc, ip, el)
-  use prec, only: &
-   dNeq, &
-   dEq0
-! #ifdef DEBUG
-!  use debug, only: &
-!    debug_level, &
-!    debug_constitutive,&
-!    debug_levelExtensive, &
-!    debug_levelSelective
-! #endif
- 
- use geometry_plastic_nonlocal, only: &
-   nIPneighbors    => geometry_plastic_nonlocal_nIPneighbors, &
-   IPneighborhood  => geometry_plastic_nonlocal_IPneighborhood, &
-   IPvolume        => geometry_plastic_nonlocal_IPvolume0, &
-   IParea          => geometry_plastic_nonlocal_IParea0, &
-   IPareaNormal    => geometry_plastic_nonlocal_IPareaNormal0
-   
-
- !use mesh, only: &
- !  mesh_element, &                 !name changed
- !  mesh_ipNeighborhood, &
- !  mesh_ipCoordinates, &
- !  mesh_ipVolume, &
- !  mesh_ipAreaNormal, &
- !  mesh_ipArea, &
- !  FE_NipNeighbors, &
- !  mesh_maxNipNeighbors, &
- !  FE_geomtype, &
- !  FE_celltype
-
- use lattice
- use math, only: &
-   math_I3
-
-!  use material, only: &
-!    phaseAt, phasememberAt, &         !name changed
-!    phase_plasticityInstance
-
-  implicit none
-  integer :: &
-    ph, en, instance, &                                             !< 'en' is size of FFT grid 8*8*8 or 16*16*16.
-    neighbor_el, &                                                  !< element number of neighboring material point
-    neighbor_ip, &                                                  !< integration point of neighboring material point
-    np, &                                                           !< neighbor phase
-    no, n                                                           !< nieghbor offset and index for loop at neighbor
-
+module subroutine plastic_kinematic_deltaFp(twinJump,deltaFp,Mp,ph,en)
+  use math, only: &
+    math_I3
   logical ,                     intent(out) :: &
     twinJump
-
   real(pReal), dimension(3,3),  intent(out) :: &
-    deltaFp                                                                                             
-
-  integer,                intent(in)  :: &       
-    ipc, &                                                           !< element index
-    ip, &                                                            !< integration point index
-    el                                                               !< grain index  @ for identifying grain boundary
-! !  real(pReal), dimension(3,3,param(instance)%totalNslip) :: &
-! !    CorrespondanceMatrix 
-  integer, dimension(52) :: &
-    twin_el_incl         
-  real(pReal), dimension(6)     :: &
-    neighbor_stt                  
+    deltaFp
+  real(pReal), dimension(3,3), intent(in) :: &
+    Mp  
+  integer, intent(in) :: &
+    ph, &
+    en
   real(pReal)   :: &
-    random, random1
+    random
   integer :: &
-    i,j,var_growth,var_nucl
-  var_growth = 0
-  var_nucl   = 0
- !ph       = phaseAt(ipc, ip, el)
- !of       = phasememberAt(ipc, ip, el)
- !instance = phase_plasticityInstance(ph)     
-
-  associate(prm => param(instance), stt => state(instance), dlt => deltaState(instance))
-
+    twin_var
+  real(pReal), dimension(param(ph)%sum_N_tw) :: &
+    dot_gamma_tw
   twinJump = .false.
   deltaFp  = math_I3
+  call kinetics_tw(Mp,ph,en,dot_gamma_tw)
+  twin_var = maxloc(dot_gamma_tw(param(:)%sum_N_tw),dim=1)
 
+  write(6,*)'twin var',twin_var
 
   call RANDOM_NUMBER(random)
-  !call RANDOM_NUMBER(random1)
 
   Success_Growth: if (random <= sum(state(ph)%gamma_tw(:,en)/param(ph)%gamma_char)) then
     twinJump = .true.
-    deltaFp  = prm%CorrespondanceMatrix(:,:,var_growth)
-    
+    deltaFp  = param(ph)%CorrespondanceMatrix(:,:,twin_var)
+      
   end if Success_Growth
-! !   Sampling: if (var_growth > 0_pInt) then
-! ! !     write(6,*)'I am sampling for growth with variant',var_growth
-! !     Ability_Growth: if (stt%f_twin_grow(var_growth,of) > stt%fmc_twin_grow(var_growth,of) &
-! !                                                           + prm%checkstep_grow) then
-! !       stt%fmc_twin_grow(var_growth,of) = stt%fmc_twin_grow(var_growth,of) &
-! !                                                           + prm%checkstep_grow     
-! !       Success_Growth: if (random <= stt%f_twin_grow(var_growth,of) .or. ALL(neighbor_stt > 0_pReal)) then
-! !           write(6,*)'growth sampling is successful for elem',el        
-! !           twinJump                = .true.
-! !           deltaFp                 =  prm%CorrespondanceMatrix(:,:,var_growth)  
-! !           dlt%f_twin_grow(:,of)   =  0.0_pReal - stt%f_twin_grow(:,of)
-! !           dlt%f_twin_nucl(:,of)   =  0.0_pReal - stt%f_twin_nucl(:,of)
-! !           dlt%fmc_twin_grow(:,of) =  0.0_pReal - stt%fmc_twin_grow(:,of)
-! !           dlt%fmc_twin_nucl(:,of) =  0.0_pReal - stt%fmc_twin_nucl(:,of)          
-! !           dlt%frozen(of)          =  1.0_pReal - stt%frozen(of)              
-! !           dlt%variant_twin(of)    =  var_growth - stt%variant_twin(of)                        
-! !       endif Success_Growth
-! !     endif Ability_Growth
 
-! !   elseif (var_growth == 0_pInt .and. prm%checkgrowth_twin > 0_pReal ) then
-!   if (var_growth == 0_pInt .and. prm%checkgrowth_twin > 0_pReal ) then
-!     var_nucl   = maxloc(stt%f_twin_nucl(:,of), dim=1)
-! !     write(6,*)'I am sampling for nucleation with variant',var_nucl,stt%f_twin_nucl(var_nucl,of)
-!     Ability_Nucleation: if (stt%f_twin_nucl(var_nucl,of) > stt%fmc_twin_nucl(var_nucl,of) &
-!                                                           + prm%checkstep_nucl) then
-!       stt%fmc_twin_nucl(var_nucl,of) = stt%fmc_twin_nucl(var_nucl,of) &
-!                                                           + prm%checkstep_nucl     
-!       Success_Nucleation: if (random <= stt%f_twin_nucl(var_nucl,of) &
-!                                                          .and. random1 <= 0.20) then 
-!           write(6,*)'nucleation sampling is successful for elem',el                                                               
-!           twinJump                = .true.
-!           deltaFp                 =  prm%CorrespondanceMatrix(:,:,var_nucl)  
-!           dlt%f_twin_nucl(:,of)   =  0.0_pReal - stt%f_twin_nucl(:,of)
-!           dlt%f_twin_grow(:,of)   =  0.0_pReal - stt%f_twin_grow(:,of)
-!           dlt%fmc_twin_nucl(:,of) =  0.0_pReal - stt%fmc_twin_nucl(:,of)
-!           dlt%fmc_twin_grow(:,of) =  0.0_pReal - stt%fmc_twin_grow(:,of)          
-!           dlt%frozen(of)          =  1.0_pReal - stt%frozen(of)              
-!           dlt%variant_twin(of)    =  var_nucl - stt%variant_twin(of)                        
-!       endif Success_Nucleation
-!     endif Ability_Nucleation
-!   endif
-! !   endif Sampling
-  end associate
-   
+  
+    
 end subroutine plastic_kinematic_deltaFp
 
 !--------------------------------------------------------------------------------------------------
