@@ -62,7 +62,8 @@ submodule(phase:plastic) phenopowerlaw
       xi_sl, &
       xi_tw, &
       gamma_sl, &
-      gamma_tw
+      gamma_tw, &
+      f_twin                                                         !Achal
   end type tPhenopowerlawState
 
 !--------------------------------------------------------------------------------------------------
@@ -268,6 +269,8 @@ module function plastic_phenopowerlaw_init() result(myPlasticity)
     stt%gamma_tw => plasticState(ph)%state(startIndex:endIndex,:)
     plasticState(ph)%atol(startIndex:endIndex) = pl%get_asFloat('atol_gamma',defaultVal=1.0e-6_pReal)
 
+    
+
     end associate
 
 !--------------------------------------------------------------------------------------------------
@@ -351,7 +354,8 @@ module function phenopowerlaw_dotState(Mp,ph,en) result(dotState)
   real(pReal), dimension(param(ph)%sum_N_sl) :: &
     dot_gamma_sl_pos,dot_gamma_sl_neg, &
     right_SlipSlip
-
+  real(pReal), dimension(param(ph)%sum_N_tw) :: &
+    fdot_twin
 
   associate(prm => param(ph), stt => state(ph), &
             dot_xi_sl => dotState(indexDotState(ph)%xi_sl(1):indexDotState(ph)%xi_sl(2)), &
@@ -361,8 +365,12 @@ module function phenopowerlaw_dotState(Mp,ph,en) result(dotState)
 
     call kinetics_sl(Mp,ph,en,dot_gamma_sl_pos,dot_gamma_sl_neg)
     dot_gamma_sl = abs(dot_gamma_sl_pos+dot_gamma_sl_neg)
-    call kinetics_tw(Mp,ph,en,dot_gamma_tw)
-
+    call kinetics_tw(Mp,ph,en,dot_gamma_tw,fdot_twin)
+    !write(6,*)'fdot_twin',fdot_twin
+    if ( en==6 ) then
+      write(6,*)'dot_gamma_tw',dot_gamma_tw
+    end if
+    
     sumF = sum(stt%gamma_tw(:,en)/prm%gamma_char)
     xi_sl_sat_offset = prm%f_sat_sl_tw*sqrt(sumF)
     right_SlipSlip = sign(abs(1.0_pReal-stt%xi_sl(:,en) / (prm%xi_inf_sl+xi_sl_sat_offset))**prm%a_sl, &
@@ -381,9 +389,9 @@ module function phenopowerlaw_dotState(Mp,ph,en) result(dotState)
 end function phenopowerlaw_dotState
 
 
-!--------------------------------------------------------------------------------------------------
-!> @brief calculates instantaneous incremental change of kinematics and associated jump state
-!--------------------------------------------------------------------------------------------------
+----------------------------------------------------------f_twin_nucl----------------------------------------
+> @brief calculates instantaneous incremental change of kinematics and associated jump state
+--------------------------------------------------------------------------------------------------
 module subroutine plastic_kinematic_deltaFp(twinJump,deltaFp,Mp,ph,en)
   use math, only: &
     math_I3
@@ -401,13 +409,15 @@ module subroutine plastic_kinematic_deltaFp(twinJump,deltaFp,Mp,ph,en)
   integer :: &
     twin_var
   real(pReal), dimension(param(ph)%sum_N_tw) :: &
-    dot_gamma_tw
+    dot_gamma_tw, fdot_twin
   twinJump = .false.
   deltaFp  = math_I3
-  call kinetics_tw(Mp,ph,en,dot_gamma_tw)
-  twin_var = maxloc(dot_gamma_tw(param(:)%sum_N_tw),dim=1)
+  call kinetics_tw(Mp,ph,en,dot_gamma_tw,fdot_twin)
+  
+  
+  twin_var = maxloc(fdot_twin(:),dim=1)                            ! Correct this
 
-  write(6,*)'twin var',twin_var
+  !write(6,*)'fdot_twin',fdot_twin
 
   call RANDOM_NUMBER(random)
 
@@ -582,7 +592,7 @@ end subroutine kinetics_sl
 ! have the optional arguments at the end.
 !--------------------------------------------------------------------------------------------------
 pure subroutine kinetics_tw(Mp,ph,en,&
-                            dot_gamma_tw,ddot_gamma_dtau_tw)
+                            dot_gamma_tw,fdot_twin,ddot_gamma_dtau_tw)
 
   real(pReal), dimension(3,3),  intent(in) :: &
     Mp                                                                                              !< Mandel stress
@@ -591,7 +601,7 @@ pure subroutine kinetics_tw(Mp,ph,en,&
     en
 
   real(pReal), dimension(param(ph)%sum_N_tw), intent(out) :: &
-    dot_gamma_tw
+    dot_gamma_tw, fdot_twin
   real(pReal), dimension(param(ph)%sum_N_tw), intent(out), optional :: &
     ddot_gamma_dtau_tw
 
@@ -607,8 +617,10 @@ pure subroutine kinetics_tw(Mp,ph,en,&
     where(tau_tw > 0.0_pReal)
       dot_gamma_tw = (1.0_pReal-sum(stt%gamma_tw(:,en)/prm%gamma_char)) &                           ! only twin in untwinned volume fraction
                    * prm%dot_gamma_0_tw*(abs(tau_tw)/stt%xi_tw(:,en))**prm%n_tw
+      fdot_twin = (prm%dot_gamma_0_tw*(abs(tau_tw)/stt%xi_tw(:,en))**prm%n_tw)/prm%gamma_char
     else where
       dot_gamma_tw = 0.0_pReal
+      fdot_twin = 0.0_pReal
     end where
 
     if (present(ddot_gamma_dtau_tw)) then
