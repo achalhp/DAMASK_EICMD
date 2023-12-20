@@ -439,6 +439,43 @@ function plastic_active(plastic_label) result(active_plastic)
 
 end function plastic_active
 
+!--------------------------------------------------------------------------------------------------
+!> @brief for constitutive models having an instantaneous change of kinematic (such as Fp, Fe or Fi)
+!>  this subroutine will return following
+!1) DeltaKinematic which is deltaFp here = Cij  (correspondance matrix) representing twinning shear and reorientation
+!2) -(twin volume fraction) for each twin system to make it harder for twinned material point to twin again by any twin system
+!3) -(last sampled volume fraction) to restart sampling
+!4) logical true if twinning possible/needed, false if not occurring/not needed
+!--------------------------------------------------------------------------------------------------
+! subroutine constitutive_KinematicJump(ph, en, Jump_occurr,deltaFp)
+
+!   integer, intent(in) :: &
+!     ph, &
+!     en
+!   logical ,                     intent(out) :: &
+!     Jump_occurr
+!   real(pReal), dimension(3,3),  intent(out) :: &
+!     deltaFp
+  
+!   real(pReal),              dimension(3,3) :: &
+!     Mp
+
+!   if (phase_plasticity(ph) /= PLASTIC_NONE_ID) then
+!     Mp = matmul(matmul(transpose(phase_mechanical_Fi(ph)%data(1:3,1:3,en)),&
+!                         phase_mechanical_Fi(ph)%data(1:3,1:3,en)),phase_mechanical_S(ph)%data(1:3,1:3,en))
+  
+
+!     plasticType: select case (phase_plasticity(ph))
+
+!       case (PLASTIC_PHENOPOWERLAW_ID) plasticType
+!         call plastic_kinematic_deltaFp(ph,en, Jump_occurr,deltaFp)
+
+!     end select plasticType
+
+!   endif
+
+! end subroutine constitutive_KinematicJump
+
 end submodule plastic
 
 

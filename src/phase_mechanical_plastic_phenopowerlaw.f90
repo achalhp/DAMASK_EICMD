@@ -366,7 +366,9 @@ associate(prm => param(ph), stt => state(ph), &
   dot_gamma_sl = abs(dot_gamma_sl_pos+dot_gamma_sl_neg)
   call kinetics_tw(Mp,ph,en,dot_gamma_tw)
   call plastic_kinematic_deltaFp(Mp,ph,en,twinJump,deltaFp)                                      ! delete this
-  !write(6,*)'param(ph)%sum_N_sl', param(ph)%sum_N_sl                                        ! delete this
+  !write(6,*)'deltaFp', deltaFp                                                                  ! delete this
+  !write(6,*)'characteristicShearTwin', prm%gamma_char
+  !write(6,*)'Schmid_twin',prm%P_sl
 
   sumF = sum(stt%gamma_tw(:,en)/prm%gamma_char)
   xi_sl_sat_offset = prm%f_sat_sl_tw*sqrt(sumF)
@@ -418,11 +420,15 @@ tau_tw = [(math_tensordot(Mp,param(ph)%P_tw(1:3,1:3,i)),i=1,param(ph)%sum_N_tw)]
 twin_var = maxloc((0.05_pReal*(abs(tau_tw)/state(ph)%xi_tw(:,en))**param(ph)%n_tw)/param(ph)%gamma_char,dim=1)          ! This prints values from 1 to 6
 fdot_twin = (0.05_pReal*(abs(tau_tw)/state(ph)%xi_tw(:,en))**param(ph)%n_tw)/param(ph)%gamma_char                       ! This is sometimes >1
 
-write(6,*) 'twin_var', twin_var
+!write(6,*) 'twin_var', twin_var                                                                      !delete this
+
+write(6,*)'correspondanceMatrix', param(ph)%CorrespondanceMatrix(:,:,1)                              !delete this
 
 call RANDOM_NUMBER(random)
 
-Success_Growth: if (random <= sum(state(ph)%gamma_tw(:,en)/param(ph)%gamma_char)) then
+!write(6,*)'random',random                                                                            !delete this
+
+Success_Growth: if (random*0.0000000000000000000000001_pReal <= sum(state(ph)%gamma_tw(:,en)/param(ph)%gamma_char)) then
   twinJump = .true.
   deltaFp  = param(ph)%CorrespondanceMatrix(:,:,twin_var)
     
@@ -431,49 +437,6 @@ end if Success_Growth
 
   
 end subroutine plastic_kinematic_deltaFp
-
-!--------------------------------------------------------------------------------------------------
-!> @brief calculates (instantaneous) incremental change of microstructure
-!--------------------------------------------------------------------------------------------------
-subroutine plastic_phenopowerlaw_deltaState(instance,of)
-use prec, only: &
-  dNeq, &
-  dEq0
-!  #ifdef DEBUG
-!   use debug, only: &
-!     debug_level, &
-!     debug_constitutive,&
-!     debug_levelExtensive, &
-!     debug_levelSelective
-!  #endif
-
-implicit none
-integer,                intent(in) :: &
-  instance, &
-  of
-
-associate(prm => param(instance), stt => state(instance), dlt => deltaState(instance))
-
-!  #ifdef DEBUG
-!   if (iand(debug_level(debug_constitutive), debug_levelExtensive) /= 0_pInt &
-!              .and. (of == prm%of_debug &
-!                     .or. .not. iand(debug_level(debug_constitutive),debug_levelSelective) /= 0_pInt)) then
-!     write(6,'(a)') '======= phenopowerlaw delta state ======='
-!  !    write(6,*) sense,state(instance)%sense(:,of)
-!   endif
-!  #endif
-
-!--------------------------------------------------------------------------------------------------
-  !dlt%f_twin_nucl(:,of)       = 0.0_pReal
-  !dlt%f_twin_grow(:,of)       = 0.0_pReal
-  !dlt%fmc_twin_nucl(:,of)     = 0.0_pReal
-  !dlt%fmc_twin_grow(:,of)     = 0.0_pReal
-  !dlt%frozen(of)              = 0.0_pReal              
-  !dlt%variant_twin(of)        = 0.0_pInt              
-
-end associate
-
-end subroutine plastic_phenopowerlaw_deltaState
 
 !--------------------------------------------------------------------------------------------------
 !> @brief Write results to HDF5 output file.
