@@ -2339,15 +2339,15 @@ function lattice_CorrespondanceMatrix_twin(Ntwin,lattice,cOverA) result(Correspo
   characteristicShearTwin =  lattice_characteristicShear_Twin(Ntwin,lattice,cOverA)
   SchmidMatrixTwin        =  lattice_SchmidMatrix_twin(Ntwin,lattice,cOverA)
 
-  write(6,*)'math_axisAngletoR', math_axisAngleToR(coordinateSystem(1:3,2,1), 180.0_pReal*INRAD)
+  write(6,*)'coordinate system', coordinateSystem(1:3,2,1)
   
-  CorrespondanceMatrix(1:3,1:3,1) = math_axisAngleToR(coordinateSystem(1:3,2,6), 180.0_pReal*INRAD)                           ! delete this
+  !CorrespondanceMatrix(1:3,1:3,1) = math_axisAngleToR(coordinateSystem(1:3,2,6), 180.0_pReal*INRAD)                           ! delete this
 
-  !do i = 1, sum(Ntwin)
-  !  CorrespondanceMatrix(1:3,1:3,i) = math_mul3333xx33(math_axisAngleToR(coordinateSystem(1:3,2,i), &
-  !                                    180.0_pReal*INRAD), MATH_I3 + characteristicShearTwin(i)* &
-  !                                    SchmidMatrixTwin(1:3,1:3,i))
-  !enddo
+  do i = 1, sum(Ntwin)
+    CorrespondanceMatrix(1:3,1:3,i) = matmul(math_axisAngleToR(coordinateSystem(1:3,2,i), &
+                                      180.0_pReal*INRAD), MATH_I3 + characteristicShearTwin(i)* &
+                                      SchmidMatrixTwin(1:3,1:3,i))
+  enddo
 
 end function lattice_CorrespondanceMatrix_twin
 

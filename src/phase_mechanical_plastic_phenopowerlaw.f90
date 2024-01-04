@@ -422,7 +422,7 @@ fdot_twin = (0.05_pReal*(abs(tau_tw)/state(ph)%xi_tw(:,en))**param(ph)%n_tw)/par
 
 !write(6,*) 'twin_var', twin_var                                                                      !delete this
 
-write(6,*)'correspondanceMatrix', param(ph)%CorrespondanceMatrix(:,:,1)                              !delete this
+!write(6,*)'correspondanceMatrix', param(ph)%CorrespondanceMatrix(:,:,1)                              !delete this
 
 call RANDOM_NUMBER(random)
 
