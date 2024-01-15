@@ -365,7 +365,7 @@ associate(prm => param(ph), stt => state(ph), &
   call kinetics_sl(Mp,ph,en,dot_gamma_sl_pos,dot_gamma_sl_neg)
   dot_gamma_sl = abs(dot_gamma_sl_pos+dot_gamma_sl_neg)
   call kinetics_tw(Mp,ph,en,dot_gamma_tw)
-  call plastic_kinematic_deltaFp(Mp,ph,en,twinJump,deltaFp)                                      ! delete this
+  if(en==1) call plastic_kinematic_deltaFp(Mp,ph,en,twinJump,deltaFp)                                      ! delete this
   !write(6,*)'deltaFp', deltaFp                                                                  ! delete this
   !write(6,*)'characteristicShearTwin', prm%gamma_char
   !write(6,*)'Schmid_twin',prm%P_sl
@@ -422,7 +422,12 @@ fdot_twin = (0.05_pReal*(abs(tau_tw)/state(ph)%xi_tw(:,en))**param(ph)%n_tw)/par
 
 !write(6,*) 'twin_var', twin_var                                                                      !delete this
 
-!write(6,*)'correspondanceMatrix', param(ph)%CorrespondanceMatrix(:,:,1)                              !delete this
+if (en==1) write(6,*)'correspondanceMatrix1', param(ph)%CorrespondanceMatrix(:,:,1)                              !delete this
+if (en==1) write(6,*)'correspondanceMatrix2', param(ph)%CorrespondanceMatrix(:,:,2)                              !delete this
+if (en==1) write(6,*)'correspondanceMatrix3', param(ph)%CorrespondanceMatrix(:,:,3)                              !delete this
+if (en==1) write(6,*)'correspondanceMatrix4', param(ph)%CorrespondanceMatrix(:,:,4)                              !delete this
+if (en==1) write(6,*)'correspondanceMatrix5', param(ph)%CorrespondanceMatrix(:,:,5)                              !delete this
+if (en==1) write(6,*)'correspondanceMatrix6', param(ph)%CorrespondanceMatrix(:,:,6)                              !delete this
 
 call RANDOM_NUMBER(random)
 

@@ -353,6 +353,13 @@ end subroutine mechanical_results
 !--------------------------------------------------------------------------------------------------
 !> @brief calculation of stress (P) with time integration based on a residuum in Lp and
 !> intermediate acceleration of the Newton-Raphson correction
+!> @modified by Satya and achal
+!> check for detour i.e. if twinning is possible (we are not going ahead in Lp loop consistency) 
+!> checking by calling the deltaFp subroutine that should return 4 things
+!1) deltaFp= Cij (correspondance matrix) representing twinning shear and reorientation
+!2) -(twin volume fraction) for each twin system to make it harder for twinned material point to twin again by any twin system
+!3) jump in the last sampled volume fraction
+!4) logical true if twinning possible false if not occurring
 !--------------------------------------------------------------------------------------------------
 function integrateStress(F,subFp0,subFi0,Delta_t,ph,en) result(broken)
 
@@ -450,7 +457,13 @@ function integrateStress(F,subFp0,subFi0,Delta_t,ph,en) result(broken)
       Fe = matmul(matmul(A,B), invFi_new)
       call phase_hooke_SandItsTangents(S, dS_dFe, dS_dFi, &
                                         Fe, Fi_new, ph, en)
+      ! achal call Kinematic DeltaFp here
 
+
+
+
+
+                                        
       call plastic_LpAndItsTangents(Lp_constitutive, dLp_dS, dLp_dFi, &
                                          S, Fi_new, ph,en)
 
