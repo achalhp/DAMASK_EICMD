@@ -204,6 +204,13 @@ submodule(phase:mechanical) plastic
         en
     end subroutine plastic_nonlocal_deltaState
 
+    !module subroutine plastic_kinematic_deltaFp(Mp,ph,en,twinJump)
+    !  implicit none
+    !  
+    !contains
+      
+    !end module subroutine 
+
   end interface
 
 contains

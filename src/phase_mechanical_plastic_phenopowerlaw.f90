@@ -54,7 +54,8 @@ type :: tIndexDotState
     xi_sl, &
     xi_tw, &
     gamma_sl, &
-    gamma_tw
+    gamma_tw, &
+    f_twin
 end type tIndexDotState
 
 type :: tPhenopowerlawState
@@ -62,7 +63,8 @@ type :: tPhenopowerlawState
     xi_sl, &
     xi_tw, &
     gamma_sl, &
-    gamma_tw
+    gamma_tw, &
+    f_twin
 end type tPhenopowerlawState
 
 !--------------------------------------------------------------------------------------------------
@@ -232,7 +234,8 @@ do ph = 1, phases%length
 ! allocate state arrays
   Nmembers = count(material_phaseID == ph)
   sizeDotState = size(['xi_sl   ','gamma_sl']) * prm%sum_N_sl &
-               + size(['xi_tw   ','gamma_tw']) * prm%sum_N_tw
+               + size(['xi_tw   ','gamma_tw']) * prm%sum_N_tw &
+               + size(['xi_tw   ','f_twin  ']) * prm%sum_N_tw
   sizeState = sizeDotState
 
   call phase_allocateState(plasticState(ph),Nmembers,sizeState,sizeDotState,0)
@@ -267,6 +270,14 @@ do ph = 1, phases%length
   idx_dot%gamma_tw = [startIndex,endIndex]
   stt%gamma_tw => plasticState(ph)%state(startIndex:endIndex,:)
   plasticState(ph)%atol(startIndex:endIndex) = pl%get_asFloat('atol_gamma',defaultVal=1.0e-6_pReal)
+
+  startIndex = endIndex + 1
+  endIndex   = endIndex + prm%sum_N_tw
+  idx_dot%f_twin = [startIndex,endIndex]
+  deltastate(ph)%f_twin => plasticState(ph)%state(startIndex:endIndex,:)
+  deltastate(ph)%f_twin = spread(xi_0_tw, 2, Nmembers)
+
+  
 
   end associate
 
@@ -442,6 +453,23 @@ end if Success_Growth
 
   
 end subroutine plastic_kinematic_deltaFp
+
+!--------------------------------------------------------------------------------------------------
+!> @brief calculates (instantaneous) incremental change of microstructure
+!> Satya, Achal
+!--------------------------------------------------------------------------------------------------
+subroutine plastic_phenopowerlaw_deltaState(ph,en)
+implicit none
+
+integer, intent(in)::&
+  ph, &
+  en
+
+deltastate(ph)%gamma_sl=0.0_pReal
+  
+
+end subroutine plastic_phenopowerlaw_deltaState
+
 
 !--------------------------------------------------------------------------------------------------
 !> @brief Write results to HDF5 output file.
