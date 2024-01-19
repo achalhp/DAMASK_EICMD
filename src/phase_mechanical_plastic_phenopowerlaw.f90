@@ -36,7 +36,7 @@ type :: tParameters
     P_tw, &
     P_nS_pos, &
     P_nS_neg, &
-    CorrespondanceMatrix                                                                         
+    CorrespondanceMatrix                                                                          !< Achal
   integer :: &
     sum_N_sl, &                                                                                   !< total number of active slip system
     sum_N_tw                                                                                      !< total number of active twin systems
@@ -55,7 +55,7 @@ type :: tIndexDotState
     xi_tw, &
     gamma_sl, &
     gamma_tw, &
-    f_twin
+    f_twin                                                                                        !< Achal
 end type tIndexDotState
 
 type :: tPhenopowerlawState
@@ -64,14 +64,14 @@ type :: tPhenopowerlawState
     xi_tw, &
     gamma_sl, &
     gamma_tw, &
-    f_twin
+    f_twin                                                                                         !< Achal
 end type tPhenopowerlawState
 
 !--------------------------------------------------------------------------------------------------
 ! containers for parameters, dot state index,  and state
 type(tParameters),         allocatable, dimension(:) :: param
 type(tIndexDotState),      allocatable, dimension(:) :: indexDotState
-type(tPhenopowerlawState), allocatable, dimension(:) :: state, dot_state, deltastate
+type(tPhenopowerlawState), allocatable, dimension(:) :: state, dot_state, deltastate                !< Achal. added deltastate
 
 contains
 
@@ -84,7 +84,7 @@ module function plastic_phenopowerlaw_init() result(myPlasticity)
 
 logical, dimension(:), allocatable :: myPlasticity
 integer :: &
-  ph, i, &
+  ph, i, o, &
   Nmembers, &
   sizeState, sizeDotState, &
   startIndex, endIndex
@@ -114,6 +114,7 @@ phases => config_material%get('phase')
 allocate(param(phases%length))
 allocate(indexDotState(phases%length))
 allocate(state(phases%length))
+allocate(deltastate(phases%length))                                                               !< Achal
 
 do ph = 1, phases%length
   if (.not. myPlasticity(ph)) cycle
@@ -181,7 +182,7 @@ do ph = 1, phases%length
     prm%P_tw     = lattice_SchmidMatrix_twin(N_tw,phase_lattice(ph),phase_cOverA(ph))
     prm%h_tw_tw  = lattice_interaction_TwinByTwin(N_tw,pl%get_as1dFloat('h_tw-tw'),phase_lattice(ph))
     prm%gamma_char = lattice_characteristicShear_twin(N_tw,phase_lattice(ph),phase_cOverA(ph))
-    prm%CorrespondanceMatrix = lattice_CorrespondanceMatrix_twin(N_tw,phase_lattice(ph),phase_cOverA(ph))
+    prm%CorrespondanceMatrix = lattice_CorrespondanceMatrix_twin(N_tw,phase_lattice(ph),phase_cOverA(ph))                    !< Achal
 
     xi_0_tw             = pl%get_as1dFloat('xi_0_tw',requiredSize=size(N_tw))
 
@@ -210,7 +211,7 @@ do ph = 1, phases%length
 !--------------------------------------------------------------------------------------------------
 ! slip-twin related parameters
   slipAndTwinActive: if (prm%sum_N_sl > 0 .and. prm%sum_N_tw > 0) then
-    prm%h_0_tw_sl  = pl%get_asFloat('h_0_tw-sl')
+    prm%h_0_tw_sl  = pl%get_asFloat('h_0_tw-sl')     ! sanity checks
     prm%h_sl_tw    = lattice_interaction_SlipByTwin(N_sl,N_tw,pl%get_as1dFloat('h_sl-tw'), &
                                                     phase_lattice(ph))
     prm%h_tw_sl    = lattice_interaction_TwinBySlip(N_tw,N_sl,pl%get_as1dFloat('h_tw-sl'), &
@@ -234,9 +235,11 @@ do ph = 1, phases%length
 ! allocate state arrays
   Nmembers = count(material_phaseID == ph)
   sizeDotState = size(['xi_sl   ','gamma_sl']) * prm%sum_N_sl &
-               + size(['xi_tw   ','gamma_tw']) * prm%sum_N_tw &
-               + size(['xi_tw   ','f_twin  ']) * prm%sum_N_tw
+               + size(['xi_tw   ','gamma_tw']) * prm%sum_N_tw !&
+               !+ size(['xi_tw   ','f_twin  ']) * prm%sum_N_tw                !Achal
   sizeState = sizeDotState
+
+  !write(6,*)"size fn", size(['xi_sl   ','gamma_sl'])                          ! Achal Delete
 
   call phase_allocateState(plasticState(ph),Nmembers,sizeState,sizeDotState,0)
   deallocate(plasticState(ph)%dotState) ! ToDo: remove dotState completely
@@ -271,12 +274,14 @@ do ph = 1, phases%length
   stt%gamma_tw => plasticState(ph)%state(startIndex:endIndex,:)
   plasticState(ph)%atol(startIndex:endIndex) = pl%get_asFloat('atol_gamma',defaultVal=1.0e-6_pReal)
 
-  startIndex = endIndex + 1
-  endIndex   = endIndex + prm%sum_N_tw
-  idx_dot%f_twin = [startIndex,endIndex]
-  deltastate(ph)%f_twin => plasticState(ph)%state(startIndex:endIndex,:)
-  deltastate(ph)%f_twin = spread(xi_0_tw, 2, Nmembers)
-
+  o = plasticState(ph)%offsetDeltaState
+  startIndex = endIndex + 1                                                      ! Achal
+  endIndex   = endIndex + prm%sum_N_tw                                           ! Achal
+  idx_dot%f_twin = [startIndex,endIndex]                                         ! Achal
+  stt%f_twin => plasticState(ph)%state(startIndex:endIndex,:)                     ! Achal
+  deltastate(ph)%f_twin => plasticState(ph)%state(startIndex-o:endIndex-o,:)         ! Achal
+  
+  !write(6,*)"delta state", deltastate(ph)%f_twin                          ! Achal Delete
   
 
   end associate
@@ -401,6 +406,7 @@ end function phenopowerlaw_dotState
 
 !--------------------------------------------------------------------------------------------------
 !> @brief calculates instantaneous incremental change of kinematics and associated jump state
+!> Satya, Achal
 !--------------------------------------------------------------------------------------------------
 module subroutine plastic_kinematic_deltaFp(Mp,ph,en,twinJump,deltaFp)
 use math, only: &
@@ -433,20 +439,16 @@ fdot_twin = (0.05_pReal*(abs(tau_tw)/state(ph)%xi_tw(:,en))**param(ph)%n_tw)/par
 
 !write(6,*) 'twin_var', twin_var                                                                      !delete this
 
-if (en==1) write(6,*)'correspondanceMatrix1', param(ph)%CorrespondanceMatrix(:,:,1)                              !delete this
-if (en==1) write(6,*)'correspondanceMatrix2', param(ph)%CorrespondanceMatrix(:,:,2)                              !delete this
-if (en==1) write(6,*)'correspondanceMatrix3', param(ph)%CorrespondanceMatrix(:,:,3)                              !delete this
-if (en==1) write(6,*)'correspondanceMatrix4', param(ph)%CorrespondanceMatrix(:,:,4)                              !delete this
-if (en==1) write(6,*)'correspondanceMatrix5', param(ph)%CorrespondanceMatrix(:,:,5)                              !delete this
-if (en==1) write(6,*)'correspondanceMatrix6', param(ph)%CorrespondanceMatrix(:,:,6)                              !delete this
+!if (en==1) write(6,*)'correspondanceMatrix1', param(ph)%CorrespondanceMatrix(:,:,1)                   !delete this                             !delete this
 
 call RANDOM_NUMBER(random)
 
 !write(6,*)'random',random                                                                            !delete this
 
-Success_Growth: if (random*0.0000000000000000000000001_pReal <= sum(state(ph)%gamma_tw(:,en)/param(ph)%gamma_char)) then
+Success_Growth: if (random*0.0000000000000000000000001_pReal <= sum(state(ph)%gamma_tw(:,en)/param(ph)%gamma_char)) then          ! Instead of sum take max
   twinJump = .true.
   deltaFp  = param(ph)%CorrespondanceMatrix(:,:,twin_var)
+  deltastate(ph)%f_twin(:,en) = 0.0_pReal - state(ph)%f_twin(:,en)
     
 end if Success_Growth
 
@@ -458,14 +460,14 @@ end subroutine plastic_kinematic_deltaFp
 !> @brief calculates (instantaneous) incremental change of microstructure
 !> Satya, Achal
 !--------------------------------------------------------------------------------------------------
-subroutine plastic_phenopowerlaw_deltaState(ph,en)
+module subroutine plastic_phenopowerlaw_deltaState(ph,en)
 implicit none
 
 integer, intent(in)::&
   ph, &
   en
 
-deltastate(ph)%gamma_sl=0.0_pReal
+deltastate(ph)%f_twin=0.0_pReal
   
 
 end subroutine plastic_phenopowerlaw_deltaState

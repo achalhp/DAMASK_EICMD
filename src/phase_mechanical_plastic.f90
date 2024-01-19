@@ -204,12 +204,24 @@ submodule(phase:mechanical) plastic
         en
     end subroutine plastic_nonlocal_deltaState
 
-    !module subroutine plastic_kinematic_deltaFp(Mp,ph,en,twinJump)
-    !  implicit none
-    !  
-    !contains
+    module subroutine plastic_phenopowerlaw_deltaState(ph,en)                          !< Achal
+      integer, intent(in)::&
+        ph, &
+        en
+    end subroutine plastic_phenopowerlaw_deltaState
+
+    module subroutine plastic_kinematic_deltaFp(Mp,ph,en,twinJump,deltaFp)             !< Achal
+      real(pReal), dimension(3,3), intent(in) :: &
+        Mp  
+      integer, intent(in) :: &
+        ph, &
+        en
+      logical ,                     intent(out) :: &
+        twinJump
+      real(pReal), dimension(3,3),  intent(out) :: &
+        deltaFp
       
-    !end module subroutine 
+    end subroutine plastic_kinematic_deltaFp
 
   end interface
 
@@ -238,7 +250,7 @@ end subroutine plastic_init
 ! Mp in, dLp_dMp out
 !--------------------------------------------------------------------------------------------------
 module subroutine plastic_LpAndItsTangents(Lp, dLp_dS, dLp_dFi, &
-                                           S, Fi, ph,en)
+                                           S, Fi, ph, en)
   integer, intent(in) :: &
     ph,en
   real(pReal),   intent(in),  dimension(3,3) :: &
@@ -392,7 +404,7 @@ module function plastic_deltaState(ph, en) result(broken)
   broken = .false.
 
   select case (phase_plasticity(ph))
-    case (PLASTIC_NONLOCAL_ID,PLASTIC_KINEHARDENING_ID)
+    case (PLASTIC_NONLOCAL_ID,PLASTIC_KINEHARDENING_ID, PLASTIC_PHENOPOWERLAW_ID)       !> Achal  
 
       Mp = matmul(matmul(transpose(phase_mechanical_Fi(ph)%data(1:3,1:3,en)),&
                          phase_mechanical_Fi(ph)%data(1:3,1:3,en)),&
@@ -405,6 +417,9 @@ module function plastic_deltaState(ph, en) result(broken)
 
         case (PLASTIC_NONLOCAL_ID) plasticType
           call plastic_nonlocal_deltaState(Mp,ph,en)
+
+        case (PLASTIC_PHENOPOWERLAW_ID) plasticType                                  !> Achal
+          call plastic_phenopowerlaw_deltaState(ph,en)                               !> Achal
 
       end select plasticType
 
