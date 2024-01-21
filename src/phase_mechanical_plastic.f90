@@ -404,7 +404,7 @@ module function plastic_deltaState(ph, en) result(broken)
   broken = .false.
 
   select case (phase_plasticity(ph))
-    case (PLASTIC_NONLOCAL_ID,PLASTIC_KINEHARDENING_ID)!, PLASTIC_PHENOPOWERLAW_ID)       !> Achal  
+    case (PLASTIC_NONLOCAL_ID,PLASTIC_KINEHARDENING_ID, PLASTIC_PHENOPOWERLAW_ID)       !> Achal  
 
       Mp = matmul(matmul(transpose(phase_mechanical_Fi(ph)%data(1:3,1:3,en)),&
                          phase_mechanical_Fi(ph)%data(1:3,1:3,en)),&
@@ -418,8 +418,8 @@ module function plastic_deltaState(ph, en) result(broken)
         case (PLASTIC_NONLOCAL_ID) plasticType
           call plastic_nonlocal_deltaState(Mp,ph,en)
 
-        !case (PLASTIC_PHENOPOWERLAW_ID) plasticType                                  !> Achal
-        !  call plastic_phenopowerlaw_deltaState(ph,en)                               !> Achal
+        case (PLASTIC_PHENOPOWERLAW_ID) plasticType                                  !> Achal
+          call plastic_phenopowerlaw_deltaState(ph,en)                               !> Achal
 
       end select plasticType
 

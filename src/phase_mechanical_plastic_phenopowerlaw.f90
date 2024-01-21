@@ -86,7 +86,7 @@ logical, dimension(:), allocatable :: myPlasticity
 integer :: &
   ph, i, o, &
   Nmembers, &
-  sizeState, sizeDotState, &
+  sizeState, sizeDotState, sizeDeltaState, &
   startIndex, endIndex
 integer,     dimension(:), allocatable :: &
   N_sl, N_tw
@@ -235,13 +235,17 @@ do ph = 1, phases%length
 ! allocate state arrays
   Nmembers = count(material_phaseID == ph)
   sizeDotState = size(['xi_sl   ','gamma_sl']) * prm%sum_N_sl &
-               + size(['xi_tw   ','gamma_tw']) * prm%sum_N_tw !&
-               !+ size(['xi_tw   ','f_twin  ']) * prm%sum_N_tw                !Achal
+               + size(['xi_tw   ','gamma_tw']) * prm%sum_N_tw &
+               + size(['xi_tw   ','f_twin  ']) * prm%sum_N_tw                !Achal
   sizeState = sizeDotState
 
-  !write(6,*)"size fn", size(['xi_sl   ','gamma_sl'])                          ! Achal Delete
+  write(6,*)"size fn", sizeDotState                          ! Achal Delete
 
-  call phase_allocateState(plasticState(ph),Nmembers,sizeState,sizeDotState,0)
+  sizeDeltaState = size(['xi_sl   ','gamma_sl']) * prm%sum_N_sl &              !Achal
+                 + size(['xi_tw   ','gamma_tw']) * prm%sum_N_tw &
+                 + size(['xi_tw   ','f_twin  ']) * prm%sum_N_tw                !Achal
+
+  call phase_allocateState(plasticState(ph),Nmembers,sizeState,sizeDotState,sizeDeltaState)
   deallocate(plasticState(ph)%dotState) ! ToDo: remove dotState completely
 
 !--------------------------------------------------------------------------------------------------
@@ -385,7 +389,7 @@ associate(prm => param(ph), stt => state(ph), &
   !write(6,*)'deltaFp', deltaFp                                                                  ! delete this
   !write(6,*)'characteristicShearTwin', prm%gamma_char
   !write(6,*)'Schmid_twin',prm%P_sl
-  if(en==1) write(6,*)'maxF',maxval(stt%gamma_tw(:,en)/prm%gamma_char)
+  !if(en==1) write(6,*)'maxF',maxval(stt%gamma_tw(:,en)/prm%gamma_char)                           ! delete Achal
 
   sumF = sum(stt%gamma_tw(:,en)/prm%gamma_char)
   xi_sl_sat_offset = prm%f_sat_sl_tw*sqrt(sumF)
@@ -469,7 +473,7 @@ integer, intent(in)::&
   ph, &
   en
 
-deltastate(ph)%f_twin=0.0_pReal
+deltastate(ph)%f_twin=1.0_pReal
   
 
 end subroutine plastic_phenopowerlaw_deltaState

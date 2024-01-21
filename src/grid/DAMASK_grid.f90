@@ -132,7 +132,7 @@ program DAMASK_grid
 ! reading field paramters from numerics file and do sanity checks
   num_grid => config_numerics%get('grid', defaultVal=emptyDict)
   stagItMax  = num_grid%get_asInt('maxStaggeredIter',defaultVal=10)
-  maxCutBack = num_grid%get_asInt('maxCutBack',defaultVal=3)
+  maxCutBack = num_grid%get_asInt('maxCutBack',defaultVal=3)                                      ! Achal. To increase this?
 
   if (stagItMax < 0)    call IO_error(301,ext_msg='maxStaggeredIter')
   if (maxCutBack < 0)   call IO_error(301,ext_msg='maxCutBack')
