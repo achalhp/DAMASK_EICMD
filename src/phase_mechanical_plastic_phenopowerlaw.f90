@@ -284,6 +284,7 @@ do ph = 1, phases%length
   idx_dot%f_twin = [startIndex,endIndex]                                         ! Achal
   stt%f_twin => plasticState(ph)%state(startIndex:endIndex,:)                     ! Achal
   deltastate(ph)%f_twin => plasticState(ph)%state(startIndex-o:endIndex-o,:)         ! Achal
+  plasticState(ph)%atol(startIndex:endIndex) = pl%get_asFloat('atol_gamma',defaultVal=1.0e-6_pReal)
   
   !write(6,*)"delta state", deltastate(ph)%f_twin                          ! Achal Delete
   
@@ -323,7 +324,7 @@ real(pReal), dimension(param(ph)%sum_N_sl) :: &
   dot_gamma_sl_pos,dot_gamma_sl_neg, &
   ddot_gamma_dtau_sl_pos,ddot_gamma_dtau_sl_neg
 real(pReal), dimension(param(ph)%sum_N_tw) :: &
-  dot_gamma_tw,ddot_gamma_dtau_tw
+  dot_gamma_tw,fdot_twin, ddot_gamma_dtau_tw
 
 Lp = 0.0_pReal
 dLp_dMp = 0.0_pReal
@@ -339,11 +340,11 @@ slipSystems: do i = 1, prm%sum_N_sl
                      + ddot_gamma_dtau_sl_neg(i) * prm%P_sl(k,l,i) * prm%P_nS_neg(m,n,i)
 end do slipSystems
 
-call kinetics_tw(Mp,ph,en,dot_gamma_tw,ddot_gamma_dtau_tw)
+call kinetics_tw(Mp,ph,en,dot_gamma_tw,fdot_twin, ddot_gamma_dtau_tw)                                       !< Achal, Skip Lp route, delete/comment
 
-twinSystems: do i = 1, prm%sum_N_tw
-  Lp = Lp + dot_gamma_tw(i)*prm%P_tw(1:3,1:3,i)
-  forall (k=1:3,l=1:3,m=1:3,n=1:3) &
+twinSystems: do i = 1, prm%sum_N_tw                                                              !< Achal, Skip Lp route, delete/comment
+  Lp = Lp + dot_gamma_tw(i)*prm%P_tw(1:3,1:3,i)                                                  !< Achal, Skip Lp route, delete/comment
+  forall (k=1:3,l=1:3,m=1:3,n=1:3) &                                                             !< Achal, Skip Lp route, delete/comment
     dLp_dMp(k,l,m,n) = dLp_dMp(k,l,m,n) &
                      + ddot_gamma_dtau_tw(i)*prm%P_tw(k,l,i)*prm%P_tw(m,n,i)
 end do twinSystems
@@ -380,16 +381,19 @@ associate(prm => param(ph), stt => state(ph), &
           dot_xi_sl => dotState(indexDotState(ph)%xi_sl(1):indexDotState(ph)%xi_sl(2)), &
           dot_xi_tw => dotState(indexDotState(ph)%xi_tw(1):indexDotState(ph)%xi_tw(2)), &
           dot_gamma_sl => dotState(indexDotState(ph)%gamma_sl(1):indexDotState(ph)%gamma_sl(2)), &
-          dot_gamma_tw => dotState(indexDotState(ph)%gamma_tw(1):indexDotState(ph)%gamma_tw(2)))
+          dot_gamma_tw => dotState(indexDotState(ph)%gamma_tw(1):indexDotState(ph)%gamma_tw(2)), & !Achal)
+          fdot_twin => dotState(indexDotState(ph)%f_twin(1):indexDotState(ph)%f_twin(2)))        !Achal
 
   call kinetics_sl(Mp,ph,en,dot_gamma_sl_pos,dot_gamma_sl_neg)
   dot_gamma_sl = abs(dot_gamma_sl_pos+dot_gamma_sl_neg)
-  call kinetics_tw(Mp,ph,en,dot_gamma_tw)
-  if(en==1) call plastic_kinematic_deltaFp(Mp,ph,en,twinJump,deltaFp)                            ! delete this                                ! delete this
+  call kinetics_tw(Mp,ph,en,dot_gamma_tw,fdot_twin)
+  !if(en==1) call plastic_kinematic_deltaFp(Mp,ph,en,twinJump,deltaFp)                            ! delete this                                ! delete this
   !write(6,*)'deltaFp', deltaFp                                                                  ! delete this
   !write(6,*)'characteristicShearTwin', prm%gamma_char
   !write(6,*)'Schmid_twin',prm%P_sl
   !if(en==1) write(6,*)'maxF',maxval(stt%gamma_tw(:,en)/prm%gamma_char)                           ! delete Achal
+  if(en==1) write(6,*)'f_twin',indexDotState(ph)%f_twin
+  !if(en==1) write(6,*)'f_twin',f_twin
 
   sumF = sum(stt%gamma_tw(:,en)/prm%gamma_char)
   xi_sl_sat_offset = prm%f_sat_sl_tw*sqrt(sumF)
@@ -597,7 +601,7 @@ end subroutine kinetics_sl
 ! have the optional arguments at the end.
 !--------------------------------------------------------------------------------------------------
 pure subroutine kinetics_tw(Mp,ph,en,&
-                          dot_gamma_tw,ddot_gamma_dtau_tw)
+                          dot_gamma_tw, fdot_twin, ddot_gamma_dtau_tw)                             !< Achal added fdot
 
 real(pReal), dimension(3,3),  intent(in) :: &
   Mp                                                                                              !< Mandel stress
@@ -606,7 +610,7 @@ integer,                      intent(in) :: &
   en
 
 real(pReal), dimension(param(ph)%sum_N_tw), intent(out) :: &
-  dot_gamma_tw
+  dot_gamma_tw, fdot_twin
 real(pReal), dimension(param(ph)%sum_N_tw), intent(out), optional :: &
   ddot_gamma_dtau_tw
 
@@ -622,6 +626,7 @@ associate(prm => param(ph), stt => state(ph))
   where(tau_tw > 0.0_pReal)
     dot_gamma_tw = (1.0_pReal-sum(stt%gamma_tw(:,en)/prm%gamma_char)) &                           ! only twin in untwinned volume fraction
                  * prm%dot_gamma_0_tw*(abs(tau_tw)/stt%xi_tw(:,en))**prm%n_tw
+    fdot_twin = (0.05_pReal*(abs(tau_tw)/state(ph)%xi_tw(:,en))**param(ph)%n_tw)/param(ph)%gamma_char
   else where
     dot_gamma_tw = 0.0_pReal
   end where
