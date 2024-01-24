@@ -6,6 +6,23 @@
 !--------------------------------------------------------------------------------------------------
 submodule(phase:plastic) phenopowerlaw
 
+  use geometry_plastic_nonlocal, only: &                                                            !< Achal Copied from nonlocal
+    nIPneighbors    => geometry_plastic_nonlocal_nIPneighbors, &
+    IPneighborhood  => geometry_plastic_nonlocal_IPneighborhood, &
+    IPvolume        => geometry_plastic_nonlocal_IPvolume0, &
+    IParea          => geometry_plastic_nonlocal_IParea0, &
+    IPareaNormal    => geometry_plastic_nonlocal_IPareaNormal0, &
+    geometry_plastic_nonlocal_disable
+
+  type :: tGeometry
+    real(pReal), dimension(:), allocatable :: V_0
+    integer, dimension(:,:,:), allocatable :: IPneighborhood
+    real(pReal), dimension(:,:), allocatable :: IParea, IPcoordinates
+    real(pReal), dimension(:,:,:), allocatable :: IPareaNormal
+  end type tGeometry
+
+  type(tGeometry), dimension(:), allocatable :: geom
+
 type :: tParameters
   real(pReal) :: &
     dot_gamma_0_sl = 1.0_pReal, &                                                                 !< reference shear strain rate for slip
@@ -111,6 +128,9 @@ print'(/,a,i0)', ' # phases: ',count(myPlasticity); flush(IO_STDOUT)
 
 
 phases => config_material%get('phase')
+
+allocate(geom(phases%length))                                                                     !< Achal
+
 allocate(param(phases%length))
 allocate(indexDotState(phases%length))
 allocate(state(phases%length))
@@ -247,6 +267,13 @@ do ph = 1, phases%length
 
   call phase_allocateState(plasticState(ph),Nmembers,sizeState,sizeDotState,sizeDeltaState)
   deallocate(plasticState(ph)%dotState) ! ToDo: remove dotState completely
+
+  allocate(geom(ph)%V_0(Nmembers))                                                           !Achal
+  allocate(geom(ph)%IPneighborhood(3,nIPneighbors,Nmembers))                                 !Achal
+  allocate(geom(ph)%IPareaNormal(3,nIPneighbors,Nmembers))
+  allocate(geom(ph)%IParea(nIPneighbors,Nmembers))
+  allocate(geom(ph)%IPcoordinates(3,Nmembers))
+  call storeGeometry(ph)                                                                     !Achal
 
 !--------------------------------------------------------------------------------------------------
 ! state aliases and initialization
@@ -392,7 +419,7 @@ associate(prm => param(ph), stt => state(ph), &
   !write(6,*)'characteristicShearTwin', prm%gamma_char
   !write(6,*)'Schmid_twin',prm%P_sl
   !if(en==1) write(6,*)'maxF',maxval(stt%gamma_tw(:,en)/prm%gamma_char)                           ! delete Achal
-  if(en==1) write(6,*)'f_twin',indexDotState(ph)%f_twin
+  !if(en==1) write(6,*)'f_twin',fdot_twin
   !if(en==1) write(6,*)'f_twin',f_twin
 
   sumF = sum(stt%gamma_tw(:,en)/prm%gamma_char)
@@ -430,8 +457,17 @@ logical ,                     intent(out) :: &
 real(pReal), dimension(3,3),  intent(out) :: &
   deltaFp
 
+  integer :: &
+    n, &                                                                                            ! neighbor index
+    en, &
+    neighbor_e, &                                                                                   ! element index of my neighbor
+    neighbor_i, &                                                                                   ! integration point index of my neighbor
+    neighbor_me, &
+    neighbor_phase
+
 real(pReal)   :: &
-  random
+  random, &
+  nRealNeighbors                                                                                   !Achal number of really existing neighbors
 integer :: &
   twin_var
 real(pReal), dimension(param(ph)%sum_N_tw) :: &
@@ -441,6 +477,18 @@ real(pReal), dimension(param(ph)%sum_N_tw) :: &
 integer :: i
 twinJump = .false.
 deltaFp  = math_I3
+
+!* loop through my neighborhood and get the connection vectors (in lattice frame) and the excess densities  !Achal
+
+nRealNeighbors = 0.0_pReal                                                                          !Achal
+
+neighbors: do n = 1,nIPneighbors
+      neighbor_e = geom(ph)%IPneighborhood(1,n,en)
+      neighbor_i = geom(ph)%IPneighborhood(2,n,en)
+      neighbor_me = material_phaseEntry(1,(neighbor_e-1)*discretization_nIPs + neighbor_i)           !Neighbour offset
+      neighbor_phase = material_phaseID(1,(neighbor_e-1)*discretization_nIPs + neighbor_i)
+      
+enddo neighbors
 
 tau_tw = [(math_tensordot(Mp,param(ph)%P_tw(1:3,1:3,i)),i=1,param(ph)%sum_N_tw)]
 twin_var = maxloc((0.05_pReal*(abs(tau_tw)/state(ph)%xi_tw(:,en))**param(ph)%n_tw)/param(ph)%gamma_char,dim=1)          ! This prints values from 1 to 6, fdot0_twin is taken as 0.05
@@ -642,5 +690,41 @@ associate(prm => param(ph), stt => state(ph))
 end associate
 
 end subroutine kinetics_tw
+
+!--------------------------------------------------------------------------------------------------
+!> Achal: Added from nonlocal
+!--------------------------------------------------------------------------------------------------
+
+subroutine storeGeometry(ph)
+
+  integer, intent(in) :: ph
+
+  integer :: ce, co, nCell
+  real(pReal), dimension(:), allocatable :: V
+  integer, dimension(:,:,:), allocatable :: neighborhood
+  real(pReal), dimension(:,:), allocatable :: area, coords
+  real(pReal), dimension(:,:,:), allocatable :: areaNormal
+
+  nCell = product(shape(IPvolume))
+
+  V = reshape(IPvolume,[nCell])
+  neighborhood = reshape(IPneighborhood,[3,nIPneighbors,nCell])
+  area = reshape(IParea,[nIPneighbors,nCell])
+  areaNormal = reshape(IPareaNormal,[3,nIPneighbors,nCell])
+  coords = reshape(discretization_IPcoords,[3,nCell])
+
+  do ce = 1, size(material_homogenizationEntry,1)
+    do co = 1, homogenization_maxNconstituents
+      if (material_phaseID(co,ce) == ph) then
+        geom(ph)%V_0(material_phaseEntry(co,ce)) = V(ce)
+        geom(ph)%IPneighborhood(:,:,material_phaseEntry(co,ce)) = neighborhood(:,:,ce)
+        geom(ph)%IParea(:,material_phaseEntry(co,ce)) = area(:,ce)
+        geom(ph)%IPareaNormal(:,:,material_phaseEntry(co,ce)) = areaNormal(:,:,ce)
+        geom(ph)%IPcoordinates(:,material_phaseEntry(co,ce)) = coords(:,ce)
+      end if
+    end do
+  end do
+
+end subroutine
 
 end submodule phenopowerlaw
