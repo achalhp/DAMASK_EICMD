@@ -88,7 +88,7 @@ end type tPhenopowerlawState
 ! containers for parameters, dot state index,  and state
 type(tParameters),         allocatable, dimension(:) :: param
 type(tIndexDotState),      allocatable, dimension(:) :: indexDotState
-type(tPhenopowerlawState), allocatable, dimension(:) :: state, dot_state, deltastate                !< Achal. added deltastate
+type(tPhenopowerlawState), allocatable, dimension(:) :: state, dotState, deltastate                !< Achal. added deltastate
 
 contains
 
@@ -139,7 +139,7 @@ allocate(deltastate(phases%length))                                             
 do ph = 1, phases%length
   if (.not. myPlasticity(ph)) cycle
 
-  associate(prm => param(ph), stt => state(ph), &
+  associate(prm => param(ph), stt => state(ph), dot => dotState(ph), &
             idx_dot => indexDotState(ph))
 
   phase => phases%get(ph)
@@ -259,14 +259,14 @@ do ph = 1, phases%length
                + size(['xi_tw   ','f_twin  ']) * prm%sum_N_tw                !Achal
   sizeState = sizeDotState
 
-  write(6,*)"size fn", sizeDotState                          ! Achal Delete
+  !write(6,*)"size fn", sizeDotState                          ! Achal Delete
 
   sizeDeltaState = size(['xi_sl   ','gamma_sl']) * prm%sum_N_sl &              !Achal
                  + size(['xi_tw   ','gamma_tw']) * prm%sum_N_tw &
                  + size(['xi_tw   ','f_twin  ']) * prm%sum_N_tw                !Achal
 
   call phase_allocateState(plasticState(ph),Nmembers,sizeState,sizeDotState,sizeDeltaState)
-  deallocate(plasticState(ph)%dotState) ! ToDo: remove dotState completely
+  !deallocate(plasticState(ph)%dotState) ! ToDo: remove dotState completely                   !Achal, dot state needed!
 
   allocate(geom(ph)%V_0(Nmembers))                                                           !Achal
   allocate(geom(ph)%IPneighborhood(3,nIPneighbors,Nmembers))                                 !Achal
@@ -282,6 +282,7 @@ do ph = 1, phases%length
   idx_dot%xi_sl = [startIndex,endIndex]
   stt%xi_sl => plasticState(ph)%state(startIndex:endIndex,:)
   stt%xi_sl =  spread(xi_0_sl, 2, Nmembers)
+
   plasticState(ph)%atol(startIndex:endIndex) = pl%get_asFloat('atol_xi',defaultVal=1.0_pReal)
   if(any(plasticState(ph)%atol(startIndex:endIndex) < 0.0_pReal)) extmsg = trim(extmsg)//' atol_xi'
 
@@ -310,10 +311,11 @@ do ph = 1, phases%length
   endIndex   = endIndex + prm%sum_N_tw                                           ! Achal
   idx_dot%f_twin = [startIndex,endIndex]                                         ! Achal
   stt%f_twin => plasticState(ph)%state(startIndex:endIndex,:)                     ! Achal
+  !dot%f_twin => plasticState(ph)%dotState(startIndex:endIndex,:)
   deltastate(ph)%f_twin => plasticState(ph)%state(startIndex-o:endIndex-o,:)         ! Achal
   plasticState(ph)%atol(startIndex:endIndex) = pl%get_asFloat('atol_gamma',defaultVal=1.0e-6_pReal)
   
-  !write(6,*)"delta state", deltastate(ph)%f_twin                          ! Achal Delete
+  write(6,*)"index", startIndex                          ! Achal Delete
   
 
   end associate
