@@ -410,15 +410,18 @@ real(pReal), dimension(param(ph)%sum_N_sl) :: &
   dot_gamma_sl_pos,dot_gamma_sl_neg, &
   right_SlipSlip
 
+real(pReal), dimension(param(ph)%sum_N_tw) :: &
+  fdot_twin
+
 logical :: twinJump                                                                               !delete this
 real(pReal), dimension(3,3) :: deltaFp                                                            !delete this
 
-associate(prm => param(ph), stt => state(ph), &
+associate(prm => param(ph), stt => state(ph), dot => dotState(ph), &
           dot_xi_sl => dotState1(indexDotState(ph)%xi_sl(1):indexDotState(ph)%xi_sl(2)), &
           dot_xi_tw => dotState1(indexDotState(ph)%xi_tw(1):indexDotState(ph)%xi_tw(2)), &
           dot_gamma_sl => dotState1(indexDotState(ph)%gamma_sl(1):indexDotState(ph)%gamma_sl(2)), &
           dot_gamma_tw => dotState1(indexDotState(ph)%gamma_tw(1):indexDotState(ph)%gamma_tw(2)), & !Achal)
-          fdot_twin => dotState1(indexDotState(ph)%f_twin(1):indexDotState(ph)%f_twin(2)))        !Achal
+          fdot_twin1 => dotState1(indexDotState(ph)%f_twin(1):indexDotState(ph)%f_twin(2)))        !Achal
 
   call kinetics_sl(Mp,ph,en,dot_gamma_sl_pos,dot_gamma_sl_neg)
   dot_gamma_sl = abs(dot_gamma_sl_pos+dot_gamma_sl_neg)
@@ -430,9 +433,11 @@ associate(prm => param(ph), stt => state(ph), &
   !if(en==1) write(6,*)'maxF',maxval(stt%gamma_tw(:,en)/prm%gamma_char)                           ! delete Achal
   !if(en==1) write(6,*)'f_twin',deltastate(ph)%f_twin
   !if(en==1) write(6,*)'f_twin',f_twin
+  
+  !
+  dot%f_twin(:,en) = fdot_twin                                                      !Achal
+  !if(en==1) write(6,*)'f_twin',state(ph)%f_twin                                           !Achal delete
 
-  dotState(ph)%f_twin(:,en) = fdot_twin                                                      !Achal
-  if(en==1) write(6,*)'f_twin',dotstate(ph)%f_twin
   sumF = sum(stt%gamma_tw(:,en)/prm%gamma_char)
   xi_sl_sat_offset = prm%f_sat_sl_tw*sqrt(sumF)
   right_SlipSlip = sign(abs(1.0_pReal-stt%xi_sl(:,en) / (prm%xi_inf_sl+xi_sl_sat_offset))**prm%a_sl, &
@@ -468,12 +473,12 @@ logical ,                     intent(out) :: &
 real(pReal), dimension(3,3),  intent(out) :: &
   deltaFp
 
-  integer :: &
-    n, &                                                                                            ! neighbor index
-    neighbor_e, &                                                                                   ! element index of my neighbor
-    neighbor_i, &                                                                                   ! integration point index of my neighbor
-    neighbor_me, &
-    neighbor_phase
+integer :: &
+  n, &                                                                                            ! neighbor index
+  neighbor_e, &                                                                                   ! element index of my neighbor
+  neighbor_i, &                                                                                   ! integration point index of my neighbor
+  neighbor_me, &
+  neighbor_phase
 
 real(pReal)   :: &
   random, &
@@ -490,6 +495,8 @@ deltaFp  = math_I3
 
 !* loop through my neighborhood and get the connection vectors (in lattice frame) and the excess densities  !Achal
 
+associate(prm => param(ph), stt => state(ph), dot => dotState(ph), del => deltastate(ph))
+
 nRealNeighbors = 0.0_pReal                                                                          !Achal
 
 neighbors: do n = 1,nIPneighbors
@@ -500,9 +507,9 @@ neighbors: do n = 1,nIPneighbors
       
 enddo neighbors
 
-tau_tw = [(math_tensordot(Mp,param(ph)%P_tw(1:3,1:3,i)),i=1,param(ph)%sum_N_tw)]
-twin_var = maxloc((0.05_pReal*(abs(tau_tw)/state(ph)%xi_tw(:,en))**param(ph)%n_tw)/param(ph)%gamma_char,dim=1)          ! This prints values from 1 to 6, fdot0_twin is taken as 0.05
-fdot_twin = (0.05_pReal*(abs(tau_tw)/state(ph)%xi_tw(:,en))**param(ph)%n_tw)/param(ph)%gamma_char                       ! This is sometimes >1
+tau_tw = [(math_tensordot(Mp,prm%P_tw(1:3,1:3,i)),i=1,prm%sum_N_tw)]
+twin_var = maxloc((0.05_pReal*(abs(tau_tw)/stt%xi_tw(:,en))**prm%n_tw)/prm%gamma_char,dim=1)          ! This prints values from 1 to 6, fdot0_twin is taken as 0.05
+fdot_twin = (0.05_pReal*(abs(tau_tw)/stt%xi_tw(:,en))**prm%n_tw)/prm%gamma_char                       ! This is sometimes >1
 
 !write(6,*) 'twin_var', twin_var                                                                      !delete this
 
@@ -513,14 +520,14 @@ call RANDOM_NUMBER(random)
 !write(6,*)'random',random                                                                            !delete this
 
 Success_Growth: if (random*0.0000000000000000000000001_pReal <= maxval((0.05_pReal*(abs(tau_tw) &
-                                /state(ph)%xi_tw(:,en))**param(ph)%n_tw)/param(ph)%gamma_char)) then          ! Instead of sum take max
+                                /stt%xi_tw(:,en))**prm%n_tw)/prm%gamma_char)) then          ! Instead of sum take max
   twinJump = .true.
-  deltaFp  = param(ph)%CorrespondanceMatrix(:,:,twin_var)
-  deltastate(ph)%f_twin(:,en) = 0.0_pReal - state(ph)%f_twin(:,en)
+  deltaFp  = prm%CorrespondanceMatrix(:,:,twin_var)
+  del%f_twin(:,en) = 0.0_pReal - stt%f_twin(:,en)
     
 end if Success_Growth
 
-
+end associate
   
 end subroutine plastic_kinematic_deltaFp
 
