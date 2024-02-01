@@ -135,7 +135,7 @@ allocate(param(phases%length))
 allocate(indexDotState(phases%length))
 allocate(state(phases%length))
 allocate(deltastate(phases%length))                                                               !< Achal
-allocate(dotState(phases%length))                                                                 !< Achal dot allocate
+!allocate(dotState(phases%length))                                                                 !< Achal dot allocate
 
 do ph = 1, phases%length
   if (.not. myPlasticity(ph)) cycle
@@ -256,20 +256,25 @@ do ph = 1, phases%length
 ! allocate state arrays
   Nmembers = count(material_phaseID == ph)
   sizeDotState = size(['xi_sl   ','gamma_sl']) * prm%sum_N_sl &
+               + size(['xi_tw   ','gamma_tw','f_twin  ']) * prm%sum_N_tw !&
+               !+ size(['xi_tw   ','f_twin  ']) * prm%sum_N_tw                !Achal
+  
+  sizeDeltaState = size(['xi_sl   ','gamma_sl']) * prm%sum_N_sl &              !Achal
                + size(['xi_tw   ','gamma_tw']) * prm%sum_N_tw &
-               + size(['xi_tw   ','f_twin  ']) * prm%sum_N_tw                !Achal
+               + size(['f_twin  ']) * prm%sum_N_tw                !Achal
+               
   sizeState = size(['xi_sl   ','gamma_sl']) * prm%sum_N_sl &
               + size(['xi_tw   ','gamma_tw']) * prm%sum_N_tw &
-              + size(['xi_tw   ','f_twin  ']) * prm%sum_N_tw                !Achal
+              + size(['f_twin  ']) * prm%sum_N_tw                !Achal
 
-  !write(6,*)"size fn", sizeDotState                          ! Achal Delete
 
-  sizeDeltaState = size(['xi_sl   ','gamma_sl']) * prm%sum_N_sl &              !Achal
-                 + size(['xi_tw   ','gamma_tw']) * prm%sum_N_tw &
-                 + size(['xi_tw   ','f_twin  ']) * prm%sum_N_tw                !Achal
+
+  write(6,*)"sizeDotState", sizeDotState                          ! Achal Delete
+  write(6,*)"sizestate", sizestate                                ! Achal Delete
+  write(6,*)"sizeDeltastate",sizeDeltaState                       ! Achal Delete
 
   call phase_allocateState(plasticState(ph),Nmembers,sizeState,sizeDotState,sizeDeltaState)
-  !deallocate(plasticState(ph)%dotState) ! ToDo: remove dotState completely                   !Achal, dotState needed, uncomment this?
+  deallocate(plasticState(ph)%dotState) ! ToDo: remove dotState completely                   !Achal, dotState needed, uncomment this?
 
   allocate(geom(ph)%V_0(Nmembers))                                                           !Achal
   allocate(geom(ph)%IPneighborhood(3,nIPneighbors,Nmembers))                                 !Achal
@@ -284,7 +289,7 @@ do ph = 1, phases%length
   endIndex   = prm%sum_N_sl
   idx_dot%xi_sl = [startIndex,endIndex]
   stt%xi_sl => plasticState(ph)%state(startIndex:endIndex,:)
-  dot%xi_sl => plasticState(ph)%dotState(startIndex:endIndex,:)
+  !dot%xi_sl => plasticState(ph)%dotState(startIndex:endIndex,:)
   stt%xi_sl =  spread(xi_0_sl, 2, Nmembers)
 
   plasticState(ph)%atol(startIndex:endIndex) = pl%get_asFloat('atol_xi',defaultVal=1.0_pReal)
@@ -294,7 +299,7 @@ do ph = 1, phases%length
   endIndex   = endIndex + prm%sum_N_tw
   idx_dot%xi_tw = [startIndex,endIndex]
   stt%xi_tw => plasticState(ph)%state(startIndex:endIndex,:)
-  dot%xi_tw => plasticState(ph)%dotState(startIndex:endIndex,:)
+  !dot%xi_tw => plasticState(ph)%dotState(startIndex:endIndex,:)
   stt%xi_tw =  spread(xi_0_tw, 2, Nmembers)
   plasticState(ph)%atol(startIndex:endIndex) = pl%get_asFloat('atol_xi',defaultVal=1.0_pReal)
 
@@ -302,7 +307,7 @@ do ph = 1, phases%length
   endIndex   = endIndex + prm%sum_N_sl
   idx_dot%gamma_sl = [startIndex,endIndex]
   stt%gamma_sl => plasticState(ph)%state(startIndex:endIndex,:)
-  dot%gamma_sl => plasticState(ph)%dotState(startIndex:endIndex,:)
+  !dot%gamma_sl => plasticState(ph)%dotState(startIndex:endIndex,:)
   plasticState(ph)%atol(startIndex:endIndex) = pl%get_asFloat('atol_gamma',defaultVal=1.0e-6_pReal)
   if(any(plasticState(ph)%atol(startIndex:endIndex) < 0.0_pReal)) extmsg = trim(extmsg)//' atol_gamma'
 
@@ -310,7 +315,7 @@ do ph = 1, phases%length
   endIndex   = endIndex + prm%sum_N_tw
   idx_dot%gamma_tw = [startIndex,endIndex]
   stt%gamma_tw => plasticState(ph)%state(startIndex:endIndex,:)
-  dot%gamma_sl => plasticState(ph)%dotState(startIndex:endIndex,:)
+  !dot%gamma_sl => plasticState(ph)%dotState(startIndex:endIndex,:)
   plasticState(ph)%atol(startIndex:endIndex) = pl%get_asFloat('atol_gamma',defaultVal=1.0e-6_pReal)
 
   o = plasticState(ph)%offsetDeltaState
@@ -318,11 +323,11 @@ do ph = 1, phases%length
   endIndex   = endIndex + prm%sum_N_tw                                           ! Achal
   idx_dot%f_twin = [startIndex,endIndex]                                         ! Achal
   stt%f_twin => plasticState(ph)%state(startIndex:endIndex,:)                     ! Achal
-  dot%f_twin => plasticState(ph)%dotState(startIndex:endIndex,:)
+  !dot%f_twin => plasticState(ph)%dotState(startIndex:endIndex,:)
   deltastate(ph)%f_twin => plasticState(ph)%state(startIndex-o:endIndex-o,:)         ! Achal
   plasticState(ph)%atol(startIndex:endIndex) = pl%get_asFloat('atol_gamma',defaultVal=1.0e-6_pReal)
   
-  write(6,*)"index", startIndex                          ! Achal Delete
+  write(6,*)"offset", o                          ! Achal Delete
   
 
   end associate
@@ -393,7 +398,7 @@ end subroutine phenopowerlaw_LpAndItsTangent
 !--------------------------------------------------------------------------------------------------
 !> @brief Calculate the rate of change of microstructure.
 !--------------------------------------------------------------------------------------------------
-module function phenopowerlaw_dotState(Mp,ph,en) result(dotState1)
+module function phenopowerlaw_dotState(Mp,ph,en) result(dotState)
 
 real(pReal), dimension(3,3),  intent(in) :: &
   Mp                                                                                              !< Mandel stress
@@ -401,7 +406,7 @@ integer,                      intent(in) :: &
   ph, &
   en
 real(pReal), dimension(plasticState(ph)%sizeDotState) :: &
-  dotState1
+  dotState
 
 real(pReal) :: &
   xi_sl_sat_offset,&
@@ -410,33 +415,27 @@ real(pReal), dimension(param(ph)%sum_N_sl) :: &
   dot_gamma_sl_pos,dot_gamma_sl_neg, &
   right_SlipSlip
 
-real(pReal), dimension(param(ph)%sum_N_tw) :: &
-  fdot_twin
+!real(pReal), dimension(param(ph)%sum_N_tw) :: &
+!  fdot_twin
 
 logical :: twinJump                                                                               !delete this
 real(pReal), dimension(3,3) :: deltaFp                                                            !delete this
 
-associate(prm => param(ph), stt => state(ph), dot => dotState(ph), &
-          dot_xi_sl => dotState1(indexDotState(ph)%xi_sl(1):indexDotState(ph)%xi_sl(2)), &
-          dot_xi_tw => dotState1(indexDotState(ph)%xi_tw(1):indexDotState(ph)%xi_tw(2)), &
-          dot_gamma_sl => dotState1(indexDotState(ph)%gamma_sl(1):indexDotState(ph)%gamma_sl(2)), &
-          dot_gamma_tw => dotState1(indexDotState(ph)%gamma_tw(1):indexDotState(ph)%gamma_tw(2)), & !Achal)
-          fdot_twin1 => dotState1(indexDotState(ph)%f_twin(1):indexDotState(ph)%f_twin(2)))        !Achal
+associate(prm => param(ph), stt => state(ph), &
+          dot_xi_sl => dotState(indexDotState(ph)%xi_sl(1):indexDotState(ph)%xi_sl(2)), &
+          dot_xi_tw => dotState(indexDotState(ph)%xi_tw(1):indexDotState(ph)%xi_tw(2)), &
+          dot_gamma_sl => dotState(indexDotState(ph)%gamma_sl(1):indexDotState(ph)%gamma_sl(2)), &
+          dot_gamma_tw => dotState(indexDotState(ph)%gamma_tw(1):indexDotState(ph)%gamma_tw(2)), & !Achal)
+          fdot_twin => dotState(indexDotState(ph)%f_twin(1):indexDotState(ph)%f_twin(2)))        !Achal
 
   call kinetics_sl(Mp,ph,en,dot_gamma_sl_pos,dot_gamma_sl_neg)
   dot_gamma_sl = abs(dot_gamma_sl_pos+dot_gamma_sl_neg)
   call kinetics_tw(Mp,ph,en,dot_gamma_tw,fdot_twin)
-  !if(en==1) call plastic_kinematic_deltaFp(Mp,ph,en,twinJump,deltaFp)                            ! delete this                                ! delete this
-  !write(6,*)'deltaFp', deltaFp                                                                  ! delete this
-  !write(6,*)'characteristicShearTwin', prm%gamma_char
-  !write(6,*)'Schmid_twin',prm%P_sl
-  !if(en==1) write(6,*)'maxF',maxval(stt%gamma_tw(:,en)/prm%gamma_char)                           ! delete Achal
-  !if(en==1) write(6,*)'f_twin',deltastate(ph)%f_twin
-  !if(en==1) write(6,*)'f_twin',f_twin
   
-  !
-  dot%f_twin(:,en) = fdot_twin                                                      !Achal
-  !if(en==1) write(6,*)'f_twin',state(ph)%f_twin                                           !Achal delete
+  
+  if(en==1) call plastic_kinematic_deltaFp(Mp,ph,en,twinJump,deltaFp)                                        ! delete this  
+  
+  if(en==1) write(6,*)'f_twin',dotState(indexDotState(ph)%f_twin(1):indexDotState(ph)%f_twin(2))                  !Achal delete
 
   sumF = sum(stt%gamma_tw(:,en)/prm%gamma_char)
   xi_sl_sat_offset = prm%f_sat_sl_tw*sqrt(sumF)
@@ -509,7 +508,7 @@ enddo neighbors
 
 tau_tw = [(math_tensordot(Mp,prm%P_tw(1:3,1:3,i)),i=1,prm%sum_N_tw)]
 twin_var = maxloc((0.05_pReal*(abs(tau_tw)/stt%xi_tw(:,en))**prm%n_tw)/prm%gamma_char,dim=1)          ! This prints values from 1 to 6, fdot0_twin is taken as 0.05
-fdot_twin = (0.05_pReal*(abs(tau_tw)/stt%xi_tw(:,en))**prm%n_tw)/prm%gamma_char                       ! This is sometimes >1
+!fdot_twin = (0.05_pReal*(abs(tau_tw)/stt%xi_tw(:,en))**prm%n_tw)/prm%gamma_char                       ! This is sometimes >1
 
 !write(6,*) 'twin_var', twin_var                                                                      !delete this
 
@@ -517,7 +516,8 @@ fdot_twin = (0.05_pReal*(abs(tau_tw)/stt%xi_tw(:,en))**prm%n_tw)/prm%gamma_char 
 
 call RANDOM_NUMBER(random)
 
-!write(6,*)'random',random                                                                            !delete this
+!write(6,*)'random',random                                                                           !delete this
+!if (en==1) write(6,*)'f_twin', stt%f_twin(:,en)
 
 Success_Growth: if (random*0.0000000000000000000000001_pReal <= maxval((0.05_pReal*(abs(tau_tw) &
                                 /stt%xi_tw(:,en))**prm%n_tw)/prm%gamma_char)) then          ! Instead of sum take max
@@ -542,7 +542,7 @@ integer, intent(in)::&
   ph, &
   en
 
-deltastate(ph)%f_twin=1.0_pReal
+deltastate(ph)%f_twin=0.0_pReal
   
 
 end subroutine plastic_phenopowerlaw_deltaState
