@@ -81,7 +81,8 @@ type :: tPhenopowerlawState
     xi_tw, &
     gamma_sl, &
     gamma_tw, &
-    f_twin                                                                                         !< Achal
+    f_twin, &
+    fmc_twin                                                                                       !< Achal
 end type tPhenopowerlawState
 
 !--------------------------------------------------------------------------------------------------
@@ -256,16 +257,13 @@ do ph = 1, phases%length
 ! allocate state arrays
   Nmembers = count(material_phaseID == ph)
   sizeDotState = size(['xi_sl   ','gamma_sl']) * prm%sum_N_sl &
-               + size(['xi_tw   ','gamma_tw','f_twin  ']) * prm%sum_N_tw !&
-               !+ size(['xi_tw   ','f_twin  ']) * prm%sum_N_tw                !Achal
+               + size(['xi_tw   ','gamma_tw','f_twin  ']) * prm%sum_N_tw      !Achal
   
-  sizeDeltaState = size(['xi_sl   ','gamma_sl']) * prm%sum_N_sl &              !Achal
-               + size(['xi_tw   ','gamma_tw']) * prm%sum_N_tw &
-               + size(['f_twin  ']) * prm%sum_N_tw                !Achal
+  sizeDeltaState = size(['f_twin  ','fmc_twin']) * prm%sum_N_tw                         !Achal
                
   sizeState = size(['xi_sl   ','gamma_sl']) * prm%sum_N_sl &
               + size(['xi_tw   ','gamma_tw']) * prm%sum_N_tw &
-              + size(['f_twin  ']) * prm%sum_N_tw                !Achal
+              + size(['f_twin  ','fmc_twin']) * prm%sum_N_tw                !Achal
 
 
 
@@ -324,8 +322,15 @@ do ph = 1, phases%length
   idx_dot%f_twin = [startIndex,endIndex]                                         ! Achal
   stt%f_twin => plasticState(ph)%state(startIndex:endIndex,:)                     ! Achal
   !dot%f_twin => plasticState(ph)%dotState(startIndex:endIndex,:)
-  deltastate(ph)%f_twin => plasticState(ph)%state(startIndex-o:endIndex-o,:)         ! Achal
+  deltastate(ph)%f_twin => plasticState(ph)%deltaState(startIndex-o:endIndex-o,:)         ! Achal
   plasticState(ph)%atol(startIndex:endIndex) = pl%get_asFloat('atol_gamma',defaultVal=1.0e-6_pReal)
+
+  startIndex        =  endIndex + 1
+  endIndex          =  endIndex + prm%totalNtwin
+  stt%fmc_twin_nucl => plasticState(p)%state   (startIndex:endIndex,:)
+  dlt%fmc_twin_nucl => plasticState(p)%deltaState(startIndex-plasticState(p)%offsetDeltaState: &
+                                                  endIndex-plasticState(p)%offsetDeltaState,:)      
+  plasticState(p)%aTolState(startIndex:endIndex) = prm%aTolShear
   
   write(6,*)"offset", o                          ! Achal Delete
   
@@ -507,10 +512,11 @@ neighbors: do n = 1,nIPneighbors
 enddo neighbors
 
 tau_tw = [(math_tensordot(Mp,prm%P_tw(1:3,1:3,i)),i=1,prm%sum_N_tw)]
-twin_var = maxloc((0.05_pReal*(abs(tau_tw)/stt%xi_tw(:,en))**prm%n_tw)/prm%gamma_char,dim=1)          ! This prints values from 1 to 6, fdot0_twin is taken as 0.05
+!twin_var = maxloc((0.05_pReal*(abs(tau_tw)/stt%xi_tw(:,en))**prm%n_tw)/prm%gamma_char,dim=1)          ! This prints values from 1 to 6, fdot0_twin is taken as 0.05
+twin_var = maxloc(stt%f_twin(:,en),dim=1)
 !fdot_twin = (0.05_pReal*(abs(tau_tw)/stt%xi_tw(:,en))**prm%n_tw)/prm%gamma_char                       ! This is sometimes >1
 
-!write(6,*) 'twin_var', twin_var                                                                      !delete this
+write(6,*) 'twin_var', twin_var                                                                      !delete this
 
 !if (en==1) write(6,*)'correspondanceMatrix1', param(ph)%CorrespondanceMatrix(:,:,1)                   !delete this                             !delete this
 
@@ -519,13 +525,13 @@ call RANDOM_NUMBER(random)
 !write(6,*)'random',random                                                                           !delete this
 !if (en==1) write(6,*)'f_twin', stt%f_twin(:,en)
 
-Success_Growth: if (random*0.0000000000000000000000001_pReal <= maxval((0.05_pReal*(abs(tau_tw) &
+Success_Nucleation: if (random*0.0000000000000000000000001_pReal <= maxval((0.05_pReal*(abs(tau_tw) &
                                 /stt%xi_tw(:,en))**prm%n_tw)/prm%gamma_char)) then          ! Instead of sum take max
   twinJump = .true.
   deltaFp  = prm%CorrespondanceMatrix(:,:,twin_var)
   del%f_twin(:,en) = 0.0_pReal - stt%f_twin(:,en)
     
-end if Success_Growth
+end if Success_Nucleation
 
 end associate
   
