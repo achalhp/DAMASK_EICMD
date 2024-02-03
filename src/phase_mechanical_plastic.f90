@@ -210,9 +210,7 @@ submodule(phase:mechanical) plastic
         en
     end subroutine plastic_phenopowerlaw_deltaState
 
-    module subroutine plastic_kinematic_deltaFp(Mp,ph,en,twinJump,deltaFp)             !< Achal
-      real(pReal), dimension(3,3), intent(in) :: &
-        Mp  
+    module subroutine plastic_kinematic_deltaFp(ph,en,twinJump,deltaFp)             !< Achal
       integer, intent(in) :: &
         ph, &
         en
@@ -469,15 +467,15 @@ end function plastic_active
 !3) -(last sampled volume fraction) to restart sampling
 !4) logical true if twinning possible/needed, false if not occurring/not needed
 !--------------------------------------------------------------------------------------------------
-! subroutine constitutive_KinematicJump(ph, en, Jump_occurr,deltaFp)
+subroutine plastic_KinematicJump(ph, en, Jump_occurr,deltaFp)
 
-!   integer, intent(in) :: &
-!     ph, &
-!     en
-!   logical ,                     intent(out) :: &
-!     Jump_occurr
-!   real(pReal), dimension(3,3),  intent(out) :: &
-!     deltaFp
+  integer, intent(in) :: &
+    ph, &
+    en
+  logical ,                     intent(out) :: &
+    Jump_occurr
+  real(pReal), dimension(3,3),  intent(out) :: &
+    deltaFp
   
 !   real(pReal),              dimension(3,3) :: &
 !     Mp
@@ -487,16 +485,16 @@ end function plastic_active
 !                         phase_mechanical_Fi(ph)%data(1:3,1:3,en)),phase_mechanical_S(ph)%data(1:3,1:3,en))
   
 
-!     plasticType: select case (phase_plasticity(ph))
+    plasticType: select case (phase_plasticity(ph))
 
-!       case (PLASTIC_PHENOPOWERLAW_ID) plasticType
-!         call plastic_kinematic_deltaFp(ph,en, Jump_occurr,deltaFp)
+      case (PLASTIC_PHENOPOWERLAW_ID) plasticType
+        call plastic_kinematic_deltaFp(ph,en, Jump_occurr,deltaFp)
 
-!     end select plasticType
+    end select plasticType
 
 !   endif
 
-! end subroutine constitutive_KinematicJump
+end subroutine plastic_KinematicJump
 
 end submodule plastic
 

@@ -37,7 +37,8 @@ type :: tParameters
     h_0_sl_sl      = 1.0_pReal, &                                                                 !< reference hardening slip - slip
     h_0_tw_sl      = 1.0_pReal, &                                                                 !< reference hardening twin - slip
     h_0_tw_tw      = 1.0_pReal, &                                                                 !< reference hardening twin - twin
-    a_sl           = 1.0_pReal
+    a_sl           = 1.0_pReal, &
+    checkstep      = 0.1_pReal                                                                    !< Achal Parameter to control sampling frequency
   real(pReal),               allocatable, dimension(:) :: &
     xi_inf_sl, &                                                                                  !< maximum critical shear stress for slip
     h_int, &                                                                                      !< per family hardening activity (optional)
@@ -82,7 +83,7 @@ type :: tPhenopowerlawState
     gamma_sl, &
     gamma_tw, &
     f_twin, &
-    fmc_twin                                                                                       !< Achal
+    fmc_twin                                                                                       !< Achal, To control sampling frequency
 end type tPhenopowerlawState
 
 !--------------------------------------------------------------------------------------------------
@@ -141,7 +142,7 @@ allocate(deltastate(phases%length))                                             
 do ph = 1, phases%length
   if (.not. myPlasticity(ph)) cycle
 
-  associate(prm => param(ph), stt => state(ph), dot => dotState(ph), &
+  associate(prm => param(ph), stt => state(ph), dot => dotState(ph), dlt => deltastate(ph), &
             idx_dot => indexDotState(ph))
 
   phase => phases%get(ph)
@@ -216,6 +217,7 @@ do ph = 1, phases%length
     prm%n_tw            = pl%get_asFloat('n_tw')
     prm%f_sat_sl_tw     = pl%get_asFloat('f_sat_sl-tw')
     prm%h_0_tw_tw       = pl%get_asFloat('h_0_tw-tw')
+    prm%checkstep       = pl%get_asFloat('checkstep', defaultVal=0.1_pReal)                        !< Achal
 
     ! expand: family => system
     xi_0_tw       = math_expand(xi_0_tw,N_tw)
@@ -322,15 +324,14 @@ do ph = 1, phases%length
   idx_dot%f_twin = [startIndex,endIndex]                                         ! Achal
   stt%f_twin => plasticState(ph)%state(startIndex:endIndex,:)                     ! Achal
   !dot%f_twin => plasticState(ph)%dotState(startIndex:endIndex,:)
-  deltastate(ph)%f_twin => plasticState(ph)%deltaState(startIndex-o:endIndex-o,:)         ! Achal
+  dlt%f_twin => plasticState(ph)%deltaState(startIndex-o:endIndex-o,:)         ! Achal
   plasticState(ph)%atol(startIndex:endIndex) = pl%get_asFloat('atol_gamma',defaultVal=1.0e-6_pReal)
 
-  startIndex        =  endIndex + 1
-  endIndex          =  endIndex + prm%totalNtwin
-  stt%fmc_twin_nucl => plasticState(p)%state   (startIndex:endIndex,:)
-  dlt%fmc_twin_nucl => plasticState(p)%deltaState(startIndex-plasticState(p)%offsetDeltaState: &
-                                                  endIndex-plasticState(p)%offsetDeltaState,:)      
-  plasticState(p)%aTolState(startIndex:endIndex) = prm%aTolShear
+  startIndex =  endIndex + 1
+  endIndex   =  endIndex + prm%sum_N_tw
+  stt%fmc_twin => plasticState(ph)%state(startIndex:endIndex,:)
+  dlt%fmc_twin => plasticState(ph)%deltaState(startIndex-o:endIndex-o,:)      
+  plasticState(ph)%atol(startIndex:endIndex) = pl%get_asFloat('atol_gamma',defaultVal=1.0e-6_pReal)
   
   write(6,*)"offset", o                          ! Achal Delete
   
@@ -438,7 +439,7 @@ associate(prm => param(ph), stt => state(ph), &
   call kinetics_tw(Mp,ph,en,dot_gamma_tw,fdot_twin)
   
   
-  if(en==1) call plastic_kinematic_deltaFp(Mp,ph,en,twinJump,deltaFp)                                        ! delete this  
+  if(en==1) call plastic_kinematic_deltaFp(ph,en,twinJump,deltaFp)                                        ! delete this  
   
   if(en==1) write(6,*)'f_twin',dotState(indexDotState(ph)%f_twin(1):indexDotState(ph)%f_twin(2))                  !Achal delete
 
@@ -464,11 +465,10 @@ end function phenopowerlaw_dotState
 !> @brief calculates instantaneous incremental change of kinematics and associated jump state
 !> Satya, Achal
 !--------------------------------------------------------------------------------------------------
-module subroutine plastic_kinematic_deltaFp(Mp,ph,en,twinJump,deltaFp)
+module subroutine plastic_kinematic_deltaFp(ph,en,twinJump,deltaFp)
 use math, only: &
   math_I3
-real(pReal), dimension(3,3), intent(in) :: &
-  Mp  
+! Mp is no longer input 
 integer, intent(in) :: &
   ph, &
   en
@@ -499,39 +499,42 @@ deltaFp  = math_I3
 
 !* loop through my neighborhood and get the connection vectors (in lattice frame) and the excess densities  !Achal
 
-associate(prm => param(ph), stt => state(ph), dot => dotState(ph), del => deltastate(ph))
+associate(prm => param(ph), stt => state(ph), dot => dotState(ph), dlt => deltastate(ph))
 
-nRealNeighbors = 0.0_pReal                                                                          !Achal
+  nRealNeighbors = 0.0_pReal                                                                          !Achal
 
-neighbors: do n = 1,nIPneighbors
-      neighbor_e = geom(ph)%IPneighborhood(1,n,en)
-      neighbor_i = geom(ph)%IPneighborhood(2,n,en)
-      neighbor_me = material_phaseEntry(1,(neighbor_e-1)*discretization_nIPs + neighbor_i)           !Neighbour offset
-      neighbor_phase = material_phaseID(1,(neighbor_e-1)*discretization_nIPs + neighbor_i)
-      
-enddo neighbors
+  neighbors: do n = 1,nIPneighbors
+        neighbor_e = geom(ph)%IPneighborhood(1,n,en)
+        neighbor_i = geom(ph)%IPneighborhood(2,n,en)
+        neighbor_me = material_phaseEntry(1,(neighbor_e-1)*discretization_nIPs + neighbor_i)           !Neighbour offset
+        neighbor_phase = material_phaseID(1,(neighbor_e-1)*discretization_nIPs + neighbor_i)
+        
+  enddo neighbors
 
-tau_tw = [(math_tensordot(Mp,prm%P_tw(1:3,1:3,i)),i=1,prm%sum_N_tw)]
-!twin_var = maxloc((0.05_pReal*(abs(tau_tw)/stt%xi_tw(:,en))**prm%n_tw)/prm%gamma_char,dim=1)          ! This prints values from 1 to 6, fdot0_twin is taken as 0.05
-twin_var = maxloc(stt%f_twin(:,en),dim=1)
-!fdot_twin = (0.05_pReal*(abs(tau_tw)/stt%xi_tw(:,en))**prm%n_tw)/prm%gamma_char                       ! This is sometimes >1
+  !tau_tw = [(math_tensordot(Mp,prm%P_tw(1:3,1:3,i)),i=1,prm%sum_N_tw)]
+  !twin_var = maxloc((0.05_pReal*(abs(tau_tw)/stt%xi_tw(:,en))**prm%n_tw)/prm%gamma_char,dim=1)          ! This prints values from 1 to 6, fdot0_twin is taken as 0.05
+  twin_var = maxloc(stt%f_twin(:,en),dim=1)
+  !fdot_twin = (0.05_pReal*(abs(tau_tw)/stt%xi_tw(:,en))**prm%n_tw)/prm%gamma_char                       ! This is sometimes >1
 
-write(6,*) 'twin_var', twin_var                                                                      !delete this
+  write(6,*) 'twin_var', twin_var                                                                      !delete this
 
-!if (en==1) write(6,*)'correspondanceMatrix1', param(ph)%CorrespondanceMatrix(:,:,1)                   !delete this                             !delete this
+  !if (en==1) write(6,*)'correspondanceMatrix1', param(ph)%CorrespondanceMatrix(:,:,1)                   !delete this                             !delete this
 
-call RANDOM_NUMBER(random)
+  call RANDOM_NUMBER(random)
 
-!write(6,*)'random',random                                                                           !delete this
-!if (en==1) write(6,*)'f_twin', stt%f_twin(:,en)
-
-Success_Nucleation: if (random*0.0000000000000000000000001_pReal <= maxval((0.05_pReal*(abs(tau_tw) &
-                                /stt%xi_tw(:,en))**prm%n_tw)/prm%gamma_char)) then          ! Instead of sum take max
-  twinJump = .true.
-  deltaFp  = prm%CorrespondanceMatrix(:,:,twin_var)
-  del%f_twin(:,en) = 0.0_pReal - stt%f_twin(:,en)
+  !write(6,*)'random',random                                                                           !delete this
+  !if (en==1) write(6,*)'f_twin', stt%f_twin(:,en)
+  Ability_Nucleation: if(stt%f_twin(twin_var,en)>(stt%fmc_twin(twin_var,en)+prm%checkstep)) then
     
-end if Success_Nucleation
+    stt%fmc_twin(twin_var,en) = stt%fmc_twin(twin_var,en)+prm%checkstep 
+    
+    Success_Nucleation: if (random*0.00000000000000000000001_pReal <= stt%f_twin(twin_var,en)) then          ! Instead of sum take max
+      twinJump = .true.
+      deltaFp  = prm%CorrespondanceMatrix(:,:,twin_var)
+      dlt%f_twin(:,en) = 0.0_pReal - stt%f_twin(:,en)    
+    end if Success_Nucleation
+
+  endif Ability_Nucleation
 
 end associate
   
