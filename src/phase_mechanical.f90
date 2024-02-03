@@ -128,6 +128,15 @@ submodule(phase) mechanical
         dLp_dFi                                                                                         !< derivative of Lp with respect to Fi
     end subroutine plastic_LpAndItsTangents
 
+    module subroutine plastic_KinematicJump(ph, en, Jump_occurr,deltaFp)
+      integer, intent(in) :: &
+        ph, &
+        en
+      logical ,                     intent(out) :: &
+        Jump_occurr
+      real(pReal), dimension(3,3),  intent(out) :: &
+        deltaFp
+    end subroutine plastic_KinematicJump
 
     module subroutine plastic_isotropic_results(ph,group)
       integer,          intent(in) :: ph
@@ -353,7 +362,7 @@ end subroutine mechanical_results
 !--------------------------------------------------------------------------------------------------
 !> @brief calculation of stress (P) with time integration based on a residuum in Lp and
 !> intermediate acceleration of the Newton-Raphson correction
-!> @modified by Satya and achal
+!> @modified by Satya and Achal
 !> check for detour i.e. if twinning is possible (we are not going ahead in Lp loop consistency) 
 !> checking by calling the deltaFp subroutine that should return 4 things
 !1) deltaFp= Cij (correspondance matrix) representing twinning shear and reorientation
@@ -389,7 +398,8 @@ function integrateStress(F,subFp0,subFi0,Delta_t,ph,en) result(broken)
                                       S, &                                                          ! 2nd Piola-Kirchhoff Stress in plastic (lattice) configuration
                                       A, &
                                       B, &
-                                      temp_33
+                                      temp_33, &
+                                      deltaFp                                                       ! Achal
   real(pReal), dimension(9) ::        temp_9                                                        ! needed for matrix inversion by LAPACK
   integer,     dimension(9) ::        devNull_9                                                     ! needed for matrix inversion by LAPACK
   real(pReal), dimension(9,9) ::      dRLp_dLp, &                                                   ! partial derivative of residuum (Jacobian for Newton-Raphson scheme)
@@ -414,10 +424,12 @@ function integrateStress(F,subFp0,subFi0,Delta_t,ph,en) result(broken)
                                       p, &
                                       jacoCounterLp, &
                                       jacoCounterLi                                                 ! counters to check for Jacobian update
-  logical :: error,broken
+  logical :: error,broken, &
+             FpJumped                                                                               ! Achal
 
 
   broken = .true.
+  FpJumped = .false.
   call plastic_dependentState(ph,en)
 
   Lpguess = phase_mechanical_Lp(ph)%data(1:3,1:3,en)                                              ! take as first guess
@@ -458,11 +470,13 @@ function integrateStress(F,subFp0,subFi0,Delta_t,ph,en) result(broken)
       call phase_hooke_SandItsTangents(S, dS_dFe, dS_dFi, &
                                         Fe, Fi_new, ph, en)
       ! achal call Kinematic DeltaFp here
+      !** Starting to implement changes for accommodating large shear and reorientation caused by twinning**
+      if(.not. FpJumped .and. NiterationStressLp>1) then
+        call plastic_KinematicJump(ph, en, FpJumped,deltaFp)
 
 
 
-
-
+      endif
                                         
       call plastic_LpAndItsTangents(Lp_constitutive, dLp_dS, dLp_dFi, &
                                          S, Fi_new, ph,en)

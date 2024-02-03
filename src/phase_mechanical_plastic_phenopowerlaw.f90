@@ -516,7 +516,7 @@ associate(prm => param(ph), stt => state(ph), dot => dotState(ph), dlt => deltas
   twin_var = maxloc(stt%f_twin(:,en),dim=1)
   !fdot_twin = (0.05_pReal*(abs(tau_tw)/stt%xi_tw(:,en))**prm%n_tw)/prm%gamma_char                       ! This is sometimes >1
 
-  write(6,*) 'twin_var', twin_var                                                                      !delete this
+  !write(6,*) 'twin_var', twin_var                                                                      !delete this
 
   !if (en==1) write(6,*)'correspondanceMatrix1', param(ph)%CorrespondanceMatrix(:,:,1)                   !delete this                             !delete this
 
