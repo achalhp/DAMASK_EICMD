@@ -439,9 +439,9 @@ associate(prm => param(ph), stt => state(ph), &
   call kinetics_tw(Mp,ph,en,dot_gamma_tw,fdot_twin)
   
   
-  if(en==1) call plastic_kinematic_deltaFp(ph,en,twinJump,deltaFp)                                        ! delete this  
+  !if(en==1) call plastic_kinematic_deltaFp(ph,en,twinJump,deltaFp)                                        ! delete this  
   
-  if(en==1) write(6,*)'f_twin',dotState(indexDotState(ph)%f_twin(1):indexDotState(ph)%f_twin(2))                  !Achal delete
+  !if(en==1) write(6,*)'f_twin',dotState(indexDotState(ph)%f_twin(1):indexDotState(ph)%f_twin(2))                  !Achal delete
 
   sumF = sum(stt%gamma_tw(:,en)/prm%gamma_char)
   xi_sl_sat_offset = prm%f_sat_sl_tw*sqrt(sumF)
@@ -531,7 +531,8 @@ associate(prm => param(ph), stt => state(ph), dot => dotState(ph), dlt => deltas
     Success_Nucleation: if (random*0.00000000000000000000001_pReal <= stt%f_twin(twin_var,en)) then          ! Instead of sum take max
       twinJump = .true.
       deltaFp  = prm%CorrespondanceMatrix(:,:,twin_var)
-      dlt%f_twin(:,en) = 0.0_pReal - stt%f_twin(:,en)    
+      dlt%f_twin(:,en)     = 0.0_pReal - stt%f_twin(:,en)
+      dlt%fmc_twin(:,en)   = 0.0_pReal - stt%fmc_twin(:,en) 
     end if Success_Nucleation
 
   endif Ability_Nucleation
@@ -551,7 +552,8 @@ integer, intent(in)::&
   ph, &
   en
 
-deltastate(ph)%f_twin=0.0_pReal
+deltastate(ph)%f_twin   = 0.0_pReal
+deltastate(ph)%fmc_twin = 0.0_pReal
   
 
 end subroutine plastic_phenopowerlaw_deltaState

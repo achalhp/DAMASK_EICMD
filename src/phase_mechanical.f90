@@ -471,10 +471,21 @@ function integrateStress(F,subFp0,subFi0,Delta_t,ph,en) result(broken)
                                         Fe, Fi_new, ph, en)
       ! achal call Kinematic DeltaFp here
       !** Starting to implement changes for accommodating large shear and reorientation caused by twinning**
-      if(.not. FpJumped .and. NiterationStressLp>1) then
+      if(.not. FpJumped .and. NiterationStressLp>1) then                !Achal: Reason for this if statement?
         call plastic_KinematicJump(ph, en, FpJumped,deltaFp)
+        if(en==15) write(6,*)'deltaFp',deltaFp                          !Achal Delete
+        
+        !converged = .true. means no more iteration
 
+        if(FpJumped) then
+          !crystallite_converged(ipc,ip,el) = .true.  !> See "phase_mechanical_constitutive" and "homogenization_mechanical_response"
+          !crystallite_todo(ipc,ip,el) = .false. !> Can't find this
+          ! _converged = .not. broken
+          subFp0 = matmul(deltaFp,subFp0) 
+! subFp0 is input need to change "phase_mechanical_Fp(ph)%data(1:3,1:3,en) = Fp_new / math_det33(Fp_new)**(1.0_pReal/3.0_pReal)"
 
+          !plasticState(ph)%state()
+        endif
 
       endif
                                         
