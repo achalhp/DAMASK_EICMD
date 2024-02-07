@@ -281,7 +281,6 @@ do ph = 1, phases%length
   allocate(geom(ph)%IPareaNormal(3,nIPneighbors,Nmembers))
   allocate(geom(ph)%IParea(nIPneighbors,Nmembers))
   allocate(geom(ph)%IPcoordinates(3,Nmembers))
-  call storeGeometry(ph)                                                                     !Achal delete
 
 !--------------------------------------------------------------------------------------------------
 ! state aliases and initialization
@@ -702,7 +701,7 @@ associate(prm => param(ph), stt => state(ph))
   where(tau_tw > 0.0_pReal)
     dot_gamma_tw = (1.0_pReal-sum(stt%gamma_tw(:,en)/prm%gamma_char)) &                           ! only twin in untwinned volume fraction
                  * prm%dot_gamma_0_tw*(abs(tau_tw)/stt%xi_tw(:,en))**prm%n_tw
-    fdot_twin = (0.05_pReal*(abs(tau_tw)/state(ph)%xi_tw(:,en))**param(ph)%n_tw)/param(ph)%gamma_char
+    fdot_twin = (0.05_pReal*(abs(tau_tw)/stt%xi_tw(:,en))**prm%n_tw)/prm%gamma_char   !Achal 0.05 is constant
   else where
     dot_gamma_tw = 0.0_pReal
   end where
@@ -718,41 +717,5 @@ associate(prm => param(ph), stt => state(ph))
 end associate
 
 end subroutine kinetics_tw
-
-!--------------------------------------------------------------------------------------------------
-!> Achal: Added from nonlocal
-!--------------------------------------------------------------------------------------------------
-
-subroutine storeGeometry(ph)
-
-  integer, intent(in) :: ph
-
-  integer :: ce, co, nCell
-  real(pReal), dimension(:), allocatable :: V
-  integer, dimension(:,:,:), allocatable :: neighborhood
-  real(pReal), dimension(:,:), allocatable :: area, coords
-  real(pReal), dimension(:,:,:), allocatable :: areaNormal
-
-  nCell = product(shape(IPvolume))
-
-  V = reshape(IPvolume,[nCell])
-  neighborhood = reshape(IPneighborhood,[3,nIPneighbors,nCell])
-  area = reshape(IParea,[nIPneighbors,nCell])
-  areaNormal = reshape(IPareaNormal,[3,nIPneighbors,nCell])
-  coords = reshape(discretization_IPcoords,[3,nCell])
-
-  do ce = 1, size(material_homogenizationEntry,1)
-    do co = 1, homogenization_maxNconstituents
-      if (material_phaseID(co,ce) == ph) then
-        geom(ph)%V_0(material_phaseEntry(co,ce)) = V(ce)
-        geom(ph)%IPneighborhood(:,:,material_phaseEntry(co,ce)) = neighborhood(:,:,ce)
-        geom(ph)%IParea(:,material_phaseEntry(co,ce)) = area(:,ce)
-        geom(ph)%IPareaNormal(:,:,material_phaseEntry(co,ce)) = areaNormal(:,:,ce)
-        geom(ph)%IPcoordinates(:,material_phaseEntry(co,ce)) = coords(:,ce)
-      end if
-    end do
-  end do
-
-end subroutine
 
 end submodule phenopowerlaw

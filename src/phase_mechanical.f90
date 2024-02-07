@@ -481,7 +481,7 @@ function integrateStress(F,subFp0,subFi0,Delta_t,ph,en) result(broken)
           !crystallite_converged(ipc,ip,el) = .true.  !> See "phase_mechanical_constitutive" and "homogenization_mechanical_response"
           !crystallite_todo(ipc,ip,el) = .false. !> Can't find this
           ! _converged = .not. broken
-          subFp0 = matmul(deltaFp,subFp0) 
+          !subFp0 = matmul(deltaFp,subFp0) 
 ! subFp0 is input need to change "phase_mechanical_Fp(ph)%data(1:3,1:3,en) = Fp_new / math_det33(Fp_new)**(1.0_pReal/3.0_pReal)"
 
           !plasticState(ph)%state()
