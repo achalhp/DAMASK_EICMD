@@ -82,8 +82,11 @@ type :: tPhenopowerlawState
     xi_tw, &
     gamma_sl, &
     gamma_tw, &
-    f_twin, &
-    fmc_twin                                                                                       !< Achal, To control sampling frequency
+    f_twin, &                                                                                   !< Twin volume fraction
+    fmc_twin                                                                                    !< Achal, To control sampling frequency
+  real(pReal), pointer, dimension(:) :: &
+    variant_twin, &
+    frozen
 end type tPhenopowerlawState
 
 !--------------------------------------------------------------------------------------------------
@@ -261,11 +264,13 @@ do ph = 1, phases%length
   sizeDotState = size(['xi_sl   ','gamma_sl']) * prm%sum_N_sl &
                + size(['xi_tw   ','gamma_tw','f_twin  ']) * prm%sum_N_tw      !Achal
   
-  sizeDeltaState = size(['f_twin  ','fmc_twin']) * prm%sum_N_tw                         !Achal
+  sizeDeltaState = size(['f_twin  ','fmc_twin']) * prm%sum_N_tw  &                       !Achal
+                   + size(['variant_twin','frozen      ']) * prm%sum_N_tw
                
   sizeState = size(['xi_sl   ','gamma_sl']) * prm%sum_N_sl &
               + size(['xi_tw   ','gamma_tw']) * prm%sum_N_tw &
-              + size(['f_twin  ','fmc_twin']) * prm%sum_N_tw                !Achal
+              + size(['f_twin  ','fmc_twin']) * prm%sum_N_tw &
+              + size(['variant_twin','frozen      ']) * prm%sum_N_tw              !Achal
 
 
 
@@ -328,9 +333,24 @@ do ph = 1, phases%length
 
   startIndex =  endIndex + 1
   endIndex   =  endIndex + prm%sum_N_tw
+  stt%frozen => plasticState(ph)%state(startIndex,:)
+  stt%frozen = 0.0_pReal-1.0_pReal 
+  dlt%frozen => plasticState(ph)%deltaState(startIndex-o,:)
+  plasticState(ph)%atol(startIndex:endIndex) = pl%get_asFloat('atol_gamma',defaultVal=1.0e-6_pReal)
+
+  startIndex =  endIndex + 1
+  endIndex   =  endIndex + prm%sum_N_tw
   stt%fmc_twin => plasticState(ph)%state(startIndex:endIndex,:)
   dlt%fmc_twin => plasticState(ph)%deltaState(startIndex-o:endIndex-o,:)      
   plasticState(ph)%atol(startIndex:endIndex) = pl%get_asFloat('atol_gamma',defaultVal=1.0e-6_pReal)
+
+  startIndex       =  endIndex + 1
+  endIndex         =  endIndex + prm%sum_N_tw
+  stt%variant_twin => plasticState(ph)%state(startIndex,:)
+  dlt%variant_twin => plasticState(ph)%deltaState(startIndex-o,:)      
+  plasticState(ph)%atol(startIndex:endIndex) = 0.0_pReal
+
+
   
   write(6,*)"offset", o                          ! Achal Delete
   
@@ -531,7 +551,9 @@ associate(prm => param(ph), stt => state(ph), dot => dotState(ph), dlt => deltas
       twinJump = .true.
       deltaFp  = prm%CorrespondanceMatrix(:,:,twin_var)
       dlt%f_twin(:,en)     = 0.0_pReal - stt%f_twin(:,en)
-      dlt%fmc_twin(:,en)   = 0.0_pReal - stt%fmc_twin(:,en) 
+      dlt%fmc_twin(:,en)   = 0.0_pReal - stt%fmc_twin(:,en)
+      dlt%frozen(en)       = 1.0_pReal - stt%frozen(en)
+      dlt%variant_twin(en) = twin_var - stt%variant_twin(en) 
     end if Success_Nucleation
 
   endif Ability_Nucleation
@@ -553,6 +575,8 @@ integer, intent(in)::&
 
 deltastate(ph)%f_twin   = 0.0_pReal
 deltastate(ph)%fmc_twin = 0.0_pReal
+deltastate(ph)%variant_twin = 0
+deltastate(ph)%frozen = 0.0_pReal
   
 
 end subroutine plastic_phenopowerlaw_deltaState
@@ -589,6 +613,17 @@ associate(prm => param(ph), stt => state(ph))
         call results_writeDataset(stt%gamma_tw,group,trim(prm%output(ou)), &
                                   'twinning shear','1',prm%systems_tw)
 
+      case('f_twin')
+        call results_writeDataset(stt%f_twin,group,trim(prm%output(ou)), &
+                                  'volume fraction','1',prm%systems_tw)
+
+      case('variant_twin')
+        call results_writeDataset(stt%variant_twin,group,trim(prm%output(ou)), &
+                                  'twin variant','1',prm%systems_tw)
+
+      case('fbinary_twin')
+        call results_writeDataset(stt%frozen,group,trim(prm%output(ou)), &
+                                  'binary twin flag','1',prm%systems_tw)                                  
     end select
 
   end do

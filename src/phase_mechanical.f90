@@ -473,15 +473,15 @@ function integrateStress(F,subFp0,subFi0,Delta_t,ph,en) result(broken)
       !** Starting to implement changes for accommodating large shear and reorientation caused by twinning**
       if(.not. FpJumped .and. NiterationStressLp>1) then                !Achal: Reason for this if statement?
         call plastic_KinematicJump(ph, en, FpJumped,deltaFp)
-        if(en==15) write(6,*)'deltaFp',deltaFp                          !Achal Delete
-        
+        !if(en==15) write(6,*)'deltaFp',deltaFp                          !Achal Delete
+        if(en==15) write(6,*)'FpJumped',FpJumped
         !converged = .true. means no more iteration
 
         if(FpJumped) then
           !crystallite_converged(ipc,ip,el) = .true.  !> See "phase_mechanical_constitutive" and "homogenization_mechanical_response"
           !crystallite_todo(ipc,ip,el) = .false. !> Can't find this
           ! _converged = .not. broken
-          !subFp0 = matmul(deltaFp,subFp0) 
+          Fp_new = matmul(deltaFp,subFp0) 
 ! subFp0 is input need to change "phase_mechanical_Fp(ph)%data(1:3,1:3,en) = Fp_new / math_det33(Fp_new)**(1.0_pReal/3.0_pReal)"
 
           !plasticState(ph)%state()
@@ -1031,7 +1031,7 @@ module function phase_mechanical_constitutive(Delta_t,co,ce) result(converged_)
     formerSubStep
   integer :: &
     ph, en, sizeDotState
-  logical :: todo
+  logical :: todo, FpJumped                                                                  !Achal
   real(pReal) :: subFrac,subStep
   real(pReal), dimension(3,3) :: &
     subFp0, &
@@ -1039,7 +1039,8 @@ module function phase_mechanical_constitutive(Delta_t,co,ce) result(converged_)
     subLp0, &
     subLi0, &
     subF0, &
-    subF
+    subF, &
+    deltaFp                                                                                 !Achal
   real(pReal), dimension(plasticState(material_phaseID(co,ce))%sizeState) :: subState0
 
 
@@ -1059,6 +1060,18 @@ module function phase_mechanical_constitutive(Delta_t,co,ce) result(converged_)
 
   todo = .true.
   cutbackLooping: do while (todo)
+
+  !matmul(deltaFp,subFp0)
+
+  ! achal calling Kinematic DeltaFp here
+  !** Starting to implement changes for accommodating large shear and reorientation caused by twinning**
+  !if(.not. FpJumped .and. NiterationStressLp>1) then                !Achal: Reason for this if statement?
+    call plastic_KinematicJump(ph, en, FpJumped,deltaFp)
+    if(FpJumped) then
+      subFp0 = matmul(deltaFp,phase_mechanical_Fp0(ph)%data(1:3,1:3,en))  
+    endif
+
+  !endif
 
     if (converged_) then
       formerSubStep = subStep
