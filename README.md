@@ -4,7 +4,7 @@ Visit [damask.mpie.de](https://damask.mpie.de) for installation and usage instru
 
 ## DAMASK_EICMD
 
-This is a DAMASK fork with "Discrete deformation twinning model" implementation based on work done by Dr. Satyapriya Gupta and Dr. Philip Eisenlohr at MSU.
+This is a DAMASK fork with "Discrete Deformation Twinning Model" implementation based on work done by Dr. Satyapriya Gupta and Dr. Philip Eisenlohr at MSU.
 
 ### The Discrete Deformation Twinning Model
 The aim of this model is to accurately match experimental observations of deformation twinning while remaining computationally efficient compared to physics-based phase field models.
