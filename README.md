@@ -1,6 +1,6 @@
 # DAMASK - The Düsseldorf Advanced Material Simulation Kit
 
-(This is a DAMASK fork with "Discrete deformation twinning model" implementation based on work done by Dr. Satyapriya Gupta and Philip Eisenlohr at MSU.)
+(This is a DAMASK fork with "Discrete deformation twinning model" implementation based on work done by Dr. Satyapriya Gupta and Dr. Philip Eisenlohr at MSU.)
 
 Visit [damask.mpie.de](https://damask.mpie.de) for installation and usage instructions
 
