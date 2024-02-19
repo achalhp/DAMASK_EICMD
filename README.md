@@ -8,11 +8,12 @@ This is a DAMASK fork with "Discrete deformation twinning model" implementation 
 
 ### The Discrete deformation twinning model
 
-*We introduce stochasticity for the nucleation and growth events of twinning through random sampling, similar to Monte Carlo Methods.
-*The ease or difficulty of a twinning event is controlled by adjusting the frequency of sampling.
-*At each voxel, the state of twinning is treated as a discrete quantity, unlike the approach based on diffused volume fraction.
-*The kinetics of twinning occur in the form of a “jump,” rather than following a rate equation as in the “pseudo-slip” approach.
-*The jumped state is evaluated using the correspondence matrix from Niewczas, Acta Materialia, 2010.
+* We introduce stochasticity for the nucleation and growth events of twinning through random sampling, similar to Monte Carlo Methods.
+
+* The ease or difficulty of a twinning event is controlled by adjusting the frequency of sampling.
+* At each voxel, the state of twinning is treated as a discrete quantity, unlike the approach based on diffused volume fraction.
+* The kinetics of twinning occur in the form of a “jump,” rather than following a rate equation as in the “pseudo-slip” approach.
+* The jumped state is evaluated using the correspondence matrix from Niewczas, Acta Materialia, 2010.
 
 ## Contact Information
 
