@@ -29,6 +29,6 @@ https://git.damask.mpie.de
 
 
 (
-EICME Team, IIT Dharwad
+EICMD Team, IIT Dharwad
 https://sites.google.com/view/eicmd/home
 )
