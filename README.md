@@ -6,7 +6,7 @@ Visit [damask.mpie.de](https://damask.mpie.de) for installation and usage instru
 
 This is a DAMASK fork with "Discrete deformation twinning model" implementation based on work done by Dr. Satyapriya Gupta and Dr. Philip Eisenlohr at MSU.)
 
-### The Discrete deformation twinning model
+### The Discrete Deformation Twinning Model
 
 * We introduce stochasticity for the nucleation and growth events of twinning through random sampling, similar to Monte Carlo Methods.
 
