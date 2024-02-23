@@ -83,10 +83,12 @@ type :: tPhenopowerlawState
     gamma_sl, &
     gamma_tw, &
     f_twin, &                                                                                   !< Twin volume fraction
-    fmc_twin                                                                                    !< Achal, To control sampling frequency
-  real(pReal), pointer, dimension(:) :: &
+    fmc_twin, &                                                                                 !< Achal, To control sampling frequency
     variant_twin, &
     frozen
+  !real(pReal), pointer, dimension(:) :: &
+  !  variant_twin, &
+  !  frozen
 end type tPhenopowerlawState
 
 !--------------------------------------------------------------------------------------------------
@@ -333,9 +335,9 @@ do ph = 1, phases%length
 
   startIndex =  endIndex + 1
   endIndex   =  endIndex + prm%sum_N_tw
-  stt%frozen => plasticState(ph)%state(startIndex,:)
+  stt%frozen => plasticState(ph)%state(startIndex:endIndex,:)
   stt%frozen = 0.0_pReal-1.0_pReal 
-  dlt%frozen => plasticState(ph)%deltaState(startIndex-o,:)
+  dlt%frozen => plasticState(ph)%deltaState(startIndex-o:endIndex-o,:)
   plasticState(ph)%atol(startIndex:endIndex) = pl%get_asFloat('atol_gamma',defaultVal=1.0e-6_pReal)
 
   startIndex =  endIndex + 1
@@ -346,8 +348,8 @@ do ph = 1, phases%length
 
   startIndex       =  endIndex + 1
   endIndex         =  endIndex + prm%sum_N_tw
-  stt%variant_twin => plasticState(ph)%state(startIndex,:)
-  dlt%variant_twin => plasticState(ph)%deltaState(startIndex-o,:)      
+  stt%variant_twin => plasticState(ph)%state(startIndex:endIndex,:)
+  dlt%variant_twin => plasticState(ph)%deltaState(startIndex-o:endIndex-o,:)      
   plasticState(ph)%atol(startIndex:endIndex) = 0.0_pReal
 
 
@@ -450,8 +452,8 @@ associate(prm => param(ph), stt => state(ph), &
           dot_xi_sl => dotState(indexDotState(ph)%xi_sl(1):indexDotState(ph)%xi_sl(2)), &
           dot_xi_tw => dotState(indexDotState(ph)%xi_tw(1):indexDotState(ph)%xi_tw(2)), &
           dot_gamma_sl => dotState(indexDotState(ph)%gamma_sl(1):indexDotState(ph)%gamma_sl(2)), &
-          dot_gamma_tw => dotState(indexDotState(ph)%gamma_tw(1):indexDotState(ph)%gamma_tw(2)), & !Achal)
-          fdot_twin => dotState(indexDotState(ph)%f_twin(1):indexDotState(ph)%f_twin(2)))        !Achal
+          dot_gamma_tw => dotState(indexDotState(ph)%gamma_tw(1):indexDotState(ph)%gamma_tw(2)), &        !Achal
+          fdot_twin => dotState(indexDotState(ph)%f_twin(1):indexDotState(ph)%f_twin(2)))                 !Achal
 
   call kinetics_sl(Mp,ph,en,dot_gamma_sl_pos,dot_gamma_sl_neg)
   dot_gamma_sl = abs(dot_gamma_sl_pos+dot_gamma_sl_neg)
@@ -547,13 +549,13 @@ associate(prm => param(ph), stt => state(ph), dot => dotState(ph), dlt => deltas
     
     stt%fmc_twin(twin_var,en) = stt%fmc_twin(twin_var,en)+prm%checkstep 
     
-    Success_Nucleation: if (random*0.00000000000000000000001_pReal <= stt%f_twin(twin_var,en)) then          ! Instead of sum take max
+    Success_Nucleation: if (random <= stt%f_twin(twin_var,en)) then          ! Instead of sum take max
       twinJump = .true.
       deltaFp  = prm%CorrespondanceMatrix(:,:,twin_var)
       dlt%f_twin(:,en)     = 0.0_pReal - stt%f_twin(:,en)
       dlt%fmc_twin(:,en)   = 0.0_pReal - stt%fmc_twin(:,en)
-      dlt%frozen(en)       = 1.0_pReal - stt%frozen(en)
-      dlt%variant_twin(en) = twin_var - stt%variant_twin(en) 
+      dlt%frozen(:,en)       = 1.0_pReal - stt%frozen(:,en)
+      dlt%variant_twin(:,en) = twin_var - stt%variant_twin(:,en)                ! Achal LHS is real, RHS integer
     end if Success_Nucleation
 
   endif Ability_Nucleation
@@ -573,11 +575,14 @@ integer, intent(in)::&
   ph, &
   en
 
-deltastate(ph)%f_twin   = 0.0_pReal
-deltastate(ph)%fmc_twin = 0.0_pReal
-deltastate(ph)%variant_twin = 0
-deltastate(ph)%frozen = 0.0_pReal
-  
+associate(dlt => deltastate(ph))
+
+  dlt%f_twin(:,en)   = 0.0_pReal
+  dlt%fmc_twin(:,en) = 0.0_pReal
+  dlt%variant_twin(:,en) = 0.0_pReal
+  dlt%frozen(:,en) = 0.0_pReal
+
+end associate
 
 end subroutine plastic_phenopowerlaw_deltaState
 
@@ -593,7 +598,7 @@ character(len=*), intent(in) :: group
 integer :: ou
 
 
-associate(prm => param(ph), stt => state(ph))
+associate(prm => param(ph), stt => state(ph), dlt=>deltastate(ph))
 
   do ou = 1,size(prm%output)
 
@@ -615,15 +620,15 @@ associate(prm => param(ph), stt => state(ph))
 
       case('f_twin')
         call results_writeDataset(stt%f_twin,group,trim(prm%output(ou)), &
-                                  'volume fraction','1',prm%systems_tw)
+                                  'volume fraction','1',prm%systems_tw)                          !Achal
 
       case('variant_twin')
-        call results_writeDataset(stt%variant_twin,group,trim(prm%output(ou)), &
-                                  'twin variant','1',prm%systems_tw)
+        call results_writeDataset(dlt%variant_twin,group,trim(prm%output(ou)), &
+                                  'twin variant','1', prm%systems_tw)                                            !Achal
 
       case('fbinary_twin')
-        call results_writeDataset(stt%frozen,group,trim(prm%output(ou)), &
-                                  'binary twin flag','1',prm%systems_tw)                                  
+        call results_writeDataset(dlt%frozen,group,trim(prm%output(ou)), &
+                                  'binary twin flag','1',prm%systems_tw)                                       !Achal
     end select
 
   end do
@@ -736,7 +741,7 @@ associate(prm => param(ph), stt => state(ph))
   where(tau_tw > 0.0_pReal)
     dot_gamma_tw = (1.0_pReal-sum(stt%gamma_tw(:,en)/prm%gamma_char)) &                           ! only twin in untwinned volume fraction
                  * prm%dot_gamma_0_tw*(abs(tau_tw)/stt%xi_tw(:,en))**prm%n_tw
-    fdot_twin = (0.05_pReal*(abs(tau_tw)/stt%xi_tw(:,en))**prm%n_tw)/prm%gamma_char   !Achal 0.05 is constant
+    fdot_twin = (0.05_pReal*(abs(tau_tw)/stt%xi_tw(:,en))**prm%n_tw)/prm%gamma_char               !Achal 0.05 is constant
   else where
     dot_gamma_tw = 0.0_pReal
   end where

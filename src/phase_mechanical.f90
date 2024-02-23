@@ -474,7 +474,7 @@ function integrateStress(F,subFp0,subFi0,Delta_t,ph,en) result(broken)
       if(.not. FpJumped .and. NiterationStressLp>1) then                !Achal: Reason for this if statement?
         call plastic_KinematicJump(ph, en, FpJumped,deltaFp)
         !if(en==15) write(6,*)'deltaFp',deltaFp                          !Achal Delete
-        if(en==15) write(6,*)'FpJumped',FpJumped
+        !if(en==15) write(6,*)'FpJumped',FpJumped
         !converged = .true. means no more iteration
 
         if(FpJumped) then
