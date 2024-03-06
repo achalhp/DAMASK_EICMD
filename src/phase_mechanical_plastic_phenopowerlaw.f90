@@ -553,6 +553,7 @@ associate(prm => param(ph), stt => state(ph), dot => dotState(ph), dlt => deltas
     Success_Nucleation: if (random <= stt%f_twin(twin_var,en)) then          ! Instead of sum take max
       twinJump = .true.
       deltaFp  = prm%CorrespondanceMatrix(:,:,twin_var)
+      write(6,*)'deltaFp',deltaFp,'element',en
       dlt%f_twin(:,en)     = 0.0_pReal - stt%f_twin(:,en)
       dlt%fmc_twin(:,en)   = 0.0_pReal - stt%fmc_twin(:,en)
       dlt%frozen(en)       = 1.0_pReal - stt%frozen(en)
@@ -739,7 +740,7 @@ associate(prm => param(ph), stt => state(ph))
 
   tau_tw = [(math_tensordot(Mp,prm%P_tw(1:3,1:3,i)),i=1,prm%sum_N_tw)]
 
-  where(tau_tw > 0.0_pReal)
+  where(tau_tw > 0.0_pReal .and. stt%frozen(en) < 0.9_pReal)
     dot_gamma_tw = (1.0_pReal-sum(stt%gamma_tw(:,en)/prm%gamma_char)) &                           ! only twin in untwinned volume fraction
                  * prm%dot_gamma_0_tw*(abs(tau_tw)/stt%xi_tw(:,en))**prm%n_tw
     fdot_twin = (0.05_pReal*(abs(tau_tw)/stt%xi_tw(:,en))**prm%n_tw)/prm%gamma_char               !Achal 0.05 is constant
