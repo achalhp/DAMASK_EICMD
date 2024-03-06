@@ -51,7 +51,7 @@ type :: tParameters
                                                                                          
   real(pReal),               allocatable, dimension(:,:,:) :: &
     P_sl, &
-    P_tw, &
+    P_tw, &                                                                                       !< Schmid matrix tiwn
     P_nS_pos, &
     P_nS_neg, &
     CorrespondanceMatrix                                                                          !< Achal
@@ -83,12 +83,12 @@ type :: tPhenopowerlawState
     gamma_sl, &
     gamma_tw, &
     f_twin, &                                                                                   !< Twin volume fraction
-    fmc_twin, &                                                                                 !< Achal, To control sampling frequency
+    fmc_twin!, &                                                                                 !< Achal, To control sampling frequency
+    !variant_twin, &
+    !frozen
+  real(pReal), pointer, dimension(:) :: &
     variant_twin, &
     frozen
-  !real(pReal), pointer, dimension(:) :: &
-  !  variant_twin, &
-  !  frozen
 end type tPhenopowerlawState
 
 !--------------------------------------------------------------------------------------------------
@@ -142,7 +142,6 @@ allocate(param(phases%length))
 allocate(indexDotState(phases%length))
 allocate(state(phases%length))
 allocate(deltastate(phases%length))                                                               !< Achal
-!allocate(dotState(phases%length))                                                                 !< Achal dot allocate
 
 do ph = 1, phases%length
   if (.not. myPlasticity(ph)) cycle
@@ -267,12 +266,12 @@ do ph = 1, phases%length
                + size(['xi_tw   ','gamma_tw','f_twin  ']) * prm%sum_N_tw      !Achal
   
   sizeDeltaState = size(['f_twin  ','fmc_twin']) * prm%sum_N_tw  &                       !Achal
-                   + size(['variant_twin','frozen      ']) * prm%sum_N_tw
+                   + size(['variant_twin','frozen      '])
                
   sizeState = size(['xi_sl   ','gamma_sl']) * prm%sum_N_sl &
               + size(['xi_tw   ','gamma_tw']) * prm%sum_N_tw &
               + size(['f_twin  ','fmc_twin']) * prm%sum_N_tw &
-              + size(['variant_twin','frozen      ']) * prm%sum_N_tw              !Achal
+              + size(['variant_twin','frozen      '])              !Achal
 
 
 
@@ -334,10 +333,10 @@ do ph = 1, phases%length
   plasticState(ph)%atol(startIndex:endIndex) = pl%get_asFloat('atol_gamma',defaultVal=1.0e-6_pReal)
 
   startIndex =  endIndex + 1
-  endIndex   =  endIndex + prm%sum_N_tw
-  stt%frozen => plasticState(ph)%state(startIndex:endIndex,:)
+  endIndex   =  endIndex + 1
+  stt%frozen => plasticState(ph)%state(startIndex,:)
   stt%frozen = 0.0_pReal-1.0_pReal 
-  dlt%frozen => plasticState(ph)%deltaState(startIndex-o:endIndex-o,:)
+  dlt%frozen => plasticState(ph)%deltaState(startIndex-o,:)
   plasticState(ph)%atol(startIndex:endIndex) = pl%get_asFloat('atol_gamma',defaultVal=1.0e-6_pReal)
 
   startIndex =  endIndex + 1
@@ -347,9 +346,10 @@ do ph = 1, phases%length
   plasticState(ph)%atol(startIndex:endIndex) = pl%get_asFloat('atol_gamma',defaultVal=1.0e-6_pReal)
 
   startIndex       =  endIndex + 1
-  endIndex         =  endIndex + prm%sum_N_tw
-  stt%variant_twin => plasticState(ph)%state(startIndex:endIndex,:)
-  dlt%variant_twin => plasticState(ph)%deltaState(startIndex-o:endIndex-o,:)      
+  endIndex         =  endIndex + 1
+  stt%variant_twin => plasticState(ph)%state(startIndex,:)
+  stt%variant_twin = 0.0_pReal
+  dlt%variant_twin => plasticState(ph)%deltaState(startIndex-o,:)      
   plasticState(ph)%atol(startIndex:endIndex) = 0.0_pReal
 
 
@@ -526,6 +526,7 @@ associate(prm => param(ph), stt => state(ph), dot => dotState(ph), dlt => deltas
 
   neighbors: do n = 1,nIPneighbors
         neighbor_e = geom(ph)%IPneighborhood(1,n,en)
+        !write(6,*) 'neighbor_e', neighbor_e
         neighbor_i = geom(ph)%IPneighborhood(2,n,en)
         neighbor_me = material_phaseEntry(1,(neighbor_e-1)*discretization_nIPs + neighbor_i)           !Neighbour offset
         neighbor_phase = material_phaseID(1,(neighbor_e-1)*discretization_nIPs + neighbor_i)
@@ -554,8 +555,8 @@ associate(prm => param(ph), stt => state(ph), dot => dotState(ph), dlt => deltas
       deltaFp  = prm%CorrespondanceMatrix(:,:,twin_var)
       dlt%f_twin(:,en)     = 0.0_pReal - stt%f_twin(:,en)
       dlt%fmc_twin(:,en)   = 0.0_pReal - stt%fmc_twin(:,en)
-      dlt%frozen(:,en)       = 1.0_pReal - stt%frozen(:,en)
-      dlt%variant_twin(:,en) = twin_var - stt%variant_twin(:,en)                ! Achal LHS is real, RHS integer
+      dlt%frozen(en)       = 1.0_pReal - stt%frozen(en)
+      dlt%variant_twin(en) = twin_var - stt%variant_twin(en)                ! Achal LHS is real, RHS integer   ! why this equation?
     end if Success_Nucleation
 
   endif Ability_Nucleation
@@ -579,8 +580,8 @@ associate(dlt => deltastate(ph))
 
   dlt%f_twin(:,en)   = 0.0_pReal
   dlt%fmc_twin(:,en) = 0.0_pReal
-  dlt%variant_twin(:,en) = 0.0_pReal
-  dlt%frozen(:,en) = 0.0_pReal
+  !dlt%variant_twin(en) = 1.0_pReal
+  !dlt%frozen(en) = 1.0_pReal
 
 end associate
 
@@ -623,12 +624,12 @@ associate(prm => param(ph), stt => state(ph), dlt=>deltastate(ph))
                                   'volume fraction','1',prm%systems_tw)                          !Achal
 
       case('variant_twin')
-        call results_writeDataset(dlt%variant_twin,group,trim(prm%output(ou)), &
-                                  'twin variant','1', prm%systems_tw)                                            !Achal
+        call results_writeDataset(stt%variant_twin,group,trim(prm%output(ou)), &
+                                  'twin variant','1')                                            !Achal
 
       case('fbinary_twin')
-        call results_writeDataset(dlt%frozen,group,trim(prm%output(ou)), &
-                                  'binary twin flag','1',prm%systems_tw)                                       !Achal
+        call results_writeDataset(stt%frozen,group,trim(prm%output(ou)), &
+                                  'binary twin flag','1')                                       !Achal
     end select
 
   end do
