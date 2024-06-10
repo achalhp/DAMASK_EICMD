@@ -287,6 +287,7 @@ do ph = 1, phases%length
   allocate(geom(ph)%IPareaNormal(3,nIPneighbors,Nmembers))
   allocate(geom(ph)%IParea(nIPneighbors,Nmembers))
   allocate(geom(ph)%IPcoordinates(3,Nmembers))
+  call storeGeometry(ph)
 
 !--------------------------------------------------------------------------------------------------
 ! state aliases and initialization
@@ -500,16 +501,16 @@ real(pReal), dimension(3,3),  intent(out) :: &
 
 integer :: &
   n, &                                                                                            ! neighbor index
-  neighbor_e, &                                                                                   ! element index of my neighbor
+  neighbor_e, neighbor_e1, &                                                                       ! element index of my neighbor
   neighbor_i, &                                                                                   ! integration point index of my neighbor
   neighbor_me, &
   neighbor_phase
 
 real(pReal)   :: &
-  random, &
+  random, random1, &
   nRealNeighbors                                                                                   !Achal number of really existing neighbors
 integer :: &
-  twin_var
+  twin_var, var_growth
 real(pReal), dimension(param(ph)%sum_N_tw) :: &
   fdot_twin
 real(pReal), dimension(param(ph)%sum_N_tw) :: &
@@ -520,18 +521,9 @@ deltaFp  = math_I3
 
 !* loop through my neighborhood and get the connection vectors (in lattice frame) and the excess densities  !Achal
 
-associate(prm => param(ph), stt => state(ph), dot => dotState(ph), dlt => deltastate(ph))
+associate(prm => param(ph), stt => state(ph), dlt => deltastate(ph))
 
   nRealNeighbors = 0.0_pReal                                                                          !Achal
-
-  neighbors: do n = 1,nIPneighbors
-        neighbor_e = geom(ph)%IPneighborhood(1,n,en)
-        !write(6,*) 'neighbor_e', neighbor_e
-        neighbor_i = geom(ph)%IPneighborhood(2,n,en)
-        neighbor_me = material_phaseEntry(1,(neighbor_e-1)*discretization_nIPs + neighbor_i)           !Neighbour offset
-        neighbor_phase = material_phaseID(1,(neighbor_e-1)*discretization_nIPs + neighbor_i)
-        
-  enddo neighbors
 
   !tau_tw = [(math_tensordot(Mp,prm%P_tw(1:3,1:3,i)),i=1,prm%sum_N_tw)]
   !twin_var = maxloc((0.05_pReal*(abs(tau_tw)/stt%xi_tw(:,en))**prm%n_tw)/prm%gamma_char,dim=1)          ! This prints values from 1 to 6, fdot0_twin is taken as 0.05
@@ -544,23 +536,55 @@ associate(prm => param(ph), stt => state(ph), dot => dotState(ph), dlt => deltas
 
   call RANDOM_NUMBER(random)
 
+  call RANDOM_NUMBER(random1)
+
   !write(6,*)'random',random                                                                           !delete this
   !if (en==1) write(6,*)'f_twin', stt%f_twin(:,en)
-  Ability_Nucleation: if(stt%f_twin(twin_var,en)>(stt%fmc_twin(twin_var,en)+prm%checkstep)) then
-    
-    stt%fmc_twin(twin_var,en) = stt%fmc_twin(twin_var,en)+prm%checkstep 
-    
-    Success_Nucleation: if (random <= stt%f_twin(twin_var,en)) then          ! Instead of sum take max
-      twinJump = .true.
-      deltaFp  = prm%CorrespondanceMatrix(:,:,twin_var)
-      write(6,*)'deltaFp',deltaFp,'element',en
-      dlt%f_twin(:,en)     = 0.0_pReal - stt%f_twin(:,en)
-      dlt%fmc_twin(:,en)   = 0.0_pReal - stt%fmc_twin(:,en)
-      dlt%frozen(en)       = 1.0_pReal - stt%frozen(en)
-      dlt%variant_twin(en) = twin_var - stt%variant_twin(en)                ! Achal LHS is real, RHS integer   ! why this equation?
-    end if Success_Nucleation
 
-  endif Ability_Nucleation
+  neighbors: do n = 1,nIPneighbors
+        neighbor_e = geom(ph)%IPneighborhood(1,n,en)
+        
+        if (any(dNeq(phase_O_0(ph)%data(en)%asQuaternion(), &
+        phase_O_0(ph)%data(neighbor_e)%asQuaternion()))) then
+          Ability_Nucleation: if(stt%f_twin(twin_var,en)>(stt%fmc_twin(twin_var,en)+prm%checkstep)) then
+    
+            stt%fmc_twin(twin_var,en) = stt%fmc_twin(twin_var,en)+prm%checkstep 
+            
+            Success_Nucleation: if (random <= stt%f_twin(twin_var,en)) then          ! Instead of sum take max
+              twinJump = .true.
+              deltaFp  = prm%CorrespondanceMatrix(:,:,twin_var)
+              dlt%f_twin(:,en)     = 0.0_pReal - stt%f_twin(:,en)
+              dlt%fmc_twin(:,en)   = 0.0_pReal - stt%fmc_twin(:,en)
+              dlt%frozen(en)       = 1.0_pReal - stt%frozen(en)
+              dlt%variant_twin(en) = twin_var !- stt%variant_twin(en)                ! Achal LHS is real, RHS integer   ! why this equation?
+              !write(6,*)'variant_twin',stt%variant_twin(en),'element',en,'frozen',stt%frozen(en)
+            end if Success_Nucleation
+        
+          endif Ability_Nucleation
+        endif
+        
+  enddo neighbors
+
+  NeighborLoop: do n = 1,nIPneighbors
+        neighbor_e1 = geom(ph)%IPneighborhood(1,n,en)
+
+        if(stt%variant_twin(neighbor_e1)>0) then                                                   !< Check if neighbor is twinned
+          var_growth = stt%variant_twin(neighbor_e1)                           
+          exit NeighborLoop
+        endif
+
+  enddo NeighborLoop
+
+  Growth_Criteria: if(var_growth>0) then                                                                    !< If neighbor twinned,
+    !Ability_Growth: if(stt%f_twin(twin_var,en)>(stt%fmc_twin(twin_var,en)+prm%checkstep(twin_var))) then    !< Frequency control
+      !stt%fmc_twin(twin_var,en) = stt%fmc_twin(twin_var,en)+prm%checkstep(twin_var)
+      Success_Growth: if (random1 <= stt%f_twin(twin_var,en)) then                                          !< Random sampling
+        twinJump = .true.                                                                                   !< Output flag
+        deltaFp  = prm%CorrespondanceMatrix(:,:,twin_var)                                                   !< Correspondence Matrix
+      endif Success_Growth
+    !endif Ability_Growth
+  endif Growth_Criteria
+
 
 end associate
   
@@ -577,12 +601,14 @@ integer, intent(in)::&
   ph, &
   en
 
+! These are updated at every strain increment. What should these initilizations be?
+
 associate(dlt => deltastate(ph))
 
   dlt%f_twin(:,en)   = 0.0_pReal
   dlt%fmc_twin(:,en) = 0.0_pReal
-  !dlt%variant_twin(en) = 1.0_pReal
-  !dlt%frozen(en) = 1.0_pReal
+  !dlt%variant_twin(en) = 0.0_pReal                                  
+  !dlt%frozen(en) = 0.0_pReal
 
 end associate
 
@@ -746,6 +772,7 @@ associate(prm => param(ph), stt => state(ph))
     fdot_twin = (0.05_pReal*(abs(tau_tw)/stt%xi_tw(:,en))**prm%n_tw)/prm%gamma_char               !Achal 0.05 is constant
   else where
     dot_gamma_tw = 0.0_pReal
+    fdot_twin = 0.0_pReal
   end where
 
   if (present(ddot_gamma_dtau_tw)) then
@@ -759,5 +786,37 @@ associate(prm => param(ph), stt => state(ph))
 end associate
 
 end subroutine kinetics_tw
+
+subroutine storeGeometry(ph)
+
+  integer, intent(in) :: ph
+
+  integer :: ce, co, nCell
+  real(pReal), dimension(:), allocatable :: V
+  integer, dimension(:,:,:), allocatable :: neighborhood
+  real(pReal), dimension(:,:), allocatable :: area, coords
+  real(pReal), dimension(:,:,:), allocatable :: areaNormal
+
+  nCell = product(shape(IPvolume))
+
+  V = reshape(IPvolume,[nCell])
+  neighborhood = reshape(IPneighborhood,[3,nIPneighbors,nCell])
+  area = reshape(IParea,[nIPneighbors,nCell])
+  areaNormal = reshape(IPareaNormal,[3,nIPneighbors,nCell])
+  coords = reshape(discretization_IPcoords,[3,nCell])
+
+  do ce = 1, size(material_homogenizationEntry,1)
+    do co = 1, homogenization_maxNconstituents
+      if (material_phaseID(co,ce) == ph) then
+        geom(ph)%V_0(material_phaseEntry(co,ce)) = V(ce)
+        geom(ph)%IPneighborhood(:,:,material_phaseEntry(co,ce)) = neighborhood(:,:,ce)
+        geom(ph)%IParea(:,material_phaseEntry(co,ce)) = area(:,ce)
+        geom(ph)%IPareaNormal(:,:,material_phaseEntry(co,ce)) = areaNormal(:,:,ce)
+        geom(ph)%IPcoordinates(:,material_phaseEntry(co,ce)) = coords(:,ce)
+      end if
+    end do
+  end do
+
+end subroutine
 
 end submodule phenopowerlaw
