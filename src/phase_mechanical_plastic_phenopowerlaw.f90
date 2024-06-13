@@ -545,7 +545,7 @@ associate(prm => param(ph), stt => state(ph), dlt => deltastate(ph))
         neighbor_e = geom(ph)%IPneighborhood(1,n,en)
         
         if (any(dNeq(phase_O_0(ph)%data(en)%asQuaternion(), &
-        phase_O_0(ph)%data(neighbor_e)%asQuaternion()))) then
+        phase_O_0(ph)%data(neighbor_e)%asQuaternion()))) then                                             !> Selection of grain boundary elements
           Ability_Nucleation: if(stt%f_twin(twin_var,en)>(stt%fmc_twin(twin_var,en)+prm%checkstep)) then
     
             stt%fmc_twin(twin_var,en) = stt%fmc_twin(twin_var,en)+prm%checkstep 
